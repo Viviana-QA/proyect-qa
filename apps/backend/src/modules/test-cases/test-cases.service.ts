@@ -5,7 +5,7 @@ import {
   TestCase,
   CreateTestCaseDto,
   UpdateTestCaseDto,
-} from '@qa/shared-types';
+} from '../../shared-types';
 
 @Injectable()
 export class TestCasesService {

@@ -10,7 +10,7 @@ import { JiraService } from './jira.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectsService } from '../projects/projects.service';
-import { CreateJiraConfigDto } from '@qa/shared-types';
+import { CreateJiraConfigDto } from '../../shared-types';
 
 @Controller()
 @UseGuards(SupabaseAuthGuard)

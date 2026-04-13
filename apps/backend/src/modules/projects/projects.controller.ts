@@ -11,7 +11,7 @@ import {
 import { ProjectsService } from './projects.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CreateProjectDto, UpdateProjectDto } from '@qa/shared-types';
+import { CreateProjectDto, UpdateProjectDto } from '../../shared-types';
 
 @Controller('projects')
 @UseGuards(SupabaseAuthGuard)

@@ -1,7 +1,7 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
-import { AIGenerateRequest, AIRefineRequest } from '@qa/shared-types';
+import { AIGenerateRequest, AIRefineRequest } from '../../shared-types';
 
 @Controller('ai')
 @UseGuards(SupabaseAuthGuard)

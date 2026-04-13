@@ -6,7 +6,7 @@ import {
   TestResult,
   CreateTestRunDto,
   SubmitTestResultDto,
-} from '@qa/shared-types';
+} from '../../shared-types';
 import { TestCasesService } from '../test-cases/test-cases.service';
 
 @Injectable()

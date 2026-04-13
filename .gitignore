@@ -33,3 +33,4 @@ blob-report/
 
 # Agent
 .qa-agent.json
+.vercel

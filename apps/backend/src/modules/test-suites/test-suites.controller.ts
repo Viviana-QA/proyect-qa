@@ -12,7 +12,7 @@ import { TestSuitesService } from './test-suites.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectsService } from '../projects/projects.service';
-import { CreateTestSuiteDto } from '@qa/shared-types';
+import { CreateTestSuiteDto } from '../../shared-types';
 
 @Controller('projects/:projectId/test-suites')
 @UseGuards(SupabaseAuthGuard)

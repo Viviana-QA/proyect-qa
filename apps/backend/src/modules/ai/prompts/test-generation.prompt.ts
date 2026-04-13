@@ -1,4 +1,4 @@
-import { AIGenerateRequest, TestType } from '@qa/shared-types';
+import { AIGenerateRequest, TestType } from '../../../shared-types';
 
 export function buildTestGenerationPrompt(request: AIGenerateRequest): string {
   const typeInstructions = request.test_types

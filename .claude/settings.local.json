@@ -25,7 +25,23 @@
       "Bash(vercel --yes --name=proyect-qa-frontend)",
       "Bash(vercel env:*)",
       "Bash(vercel --prod --yes)",
-      "Bash(vercel deploy:*)"
+      "Bash(vercel deploy:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(VITE_SUPABASE_URL=\"https://tsnqqmsrydsfuaezkfkr.supabase.co\" VITE_SUPABASE_ANON_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjA0NTksImV4cCI6MjA5MTMzNjQ1OX0.G4UuTepLGFLEbAy1ydCiVF_h2BwXPqFGJ_IDkxyQdGQ\" VITE_API_URL=\"https://proyect-qa-backend.vercel.app/api\" npx turbo build --filter=frontend --force)",
+      "WebFetch(domain:dist-hqft3ows7-viviana-qas-projects.vercel.app)",
+      "WebFetch(domain:dist-theta-wine-58.vercel.app)",
+      "mcp__mcp-registry__search_mcp_registry",
+      "Bash(curl -s https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/ -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s 'https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/projects?select=id&limit=1' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' 'https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/__TRACKED_VAR__?select=id&limit=1' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' 'https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/__TRACKED_VAR__?limit=0' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE')",
+      "Bash(npx -y @anthropic-ai/claude-code@latest mcp list)",
+      "Bash(npx @anthropic-ai/claude-code@latest mcp add supabase -- npx -y @supabase/mcp-server-supabase@latest --supabase-access-token \"\" --project-ref tsnqqmsrydsfuaezkfkr --read-only)",
+      "Bash(chmod +x scripts/supabase-query.sh)",
+      "Bash(npx @anthropic-ai/claude-code@latest mcp remove supabase)",
+      "Bash(npx @anthropic-ai/claude-code@latest mcp add supabase -- npx -y @supabase/mcp-server-supabase@latest --supabase-access-token sbp_461051957c9a79de41c4c213708ab660e695e548 --project-ref tsnqqmsrydsfuaezkfkr --read-only)",
+      "Bash(rm -f /Users/imaginamos/Documents/proyect-qa/.git/index.lock)"
     ]
   }
 }

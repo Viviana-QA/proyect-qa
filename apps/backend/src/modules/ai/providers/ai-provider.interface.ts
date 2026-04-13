@@ -1,4 +1,4 @@
-import { AIGenerateRequest, AIGeneratedTestCase } from '@qa/shared-types';
+import { AIGenerateRequest, AIGeneratedTestCase } from '../../../shared-types';
 
 export interface AIProvider {
   generateTestCases(request: AIGenerateRequest): Promise<AIGeneratedTestCase[]>;

@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../config/supabase.module';
-import { Report, ReportSummary } from '@qa/shared-types';
+import { Report, ReportSummary } from '../../shared-types';
 import { TestRunsService } from '../test-runs/test-runs.service';
 
 @Injectable()

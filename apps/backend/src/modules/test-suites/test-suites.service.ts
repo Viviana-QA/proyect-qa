@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../config/supabase.module';
-import { TestSuite, CreateTestSuiteDto } from '@qa/shared-types';
+import { TestSuite, CreateTestSuiteDto } from '../../shared-types';
 
 @Injectable()
 export class TestSuitesService {

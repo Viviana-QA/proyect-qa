@@ -5,7 +5,7 @@ import { AIProvider } from './ai-provider.interface';
 import {
   AIGenerateRequest,
   AIGeneratedTestCase,
-} from '@qa/shared-types';
+} from '../../../shared-types';
 import {
   buildTestGenerationPrompt,
   buildRefinePrompt,

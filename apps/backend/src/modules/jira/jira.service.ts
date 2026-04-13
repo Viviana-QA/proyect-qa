@@ -7,7 +7,7 @@ import {
   CreateJiraConfigDto,
   UpdateJiraConfigDto,
   JiraDocument,
-} from '@qa/shared-types';
+} from '../../shared-types';
 import * as crypto from 'crypto';
 
 @Injectable()

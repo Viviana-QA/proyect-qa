@@ -8,7 +8,7 @@ import {
   AIRefineRequest,
   AIRefineResponse,
   TestType,
-} from '@qa/shared-types';
+} from '../../shared-types';
 
 @Injectable()
 export class AIService {

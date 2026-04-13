@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../config/supabase.module';
-import { CreateProjectDto, UpdateProjectDto, Project } from '@qa/shared-types';
+import { CreateProjectDto, UpdateProjectDto, Project } from '../../shared-types';
 
 @Injectable()
 export class ProjectsService {

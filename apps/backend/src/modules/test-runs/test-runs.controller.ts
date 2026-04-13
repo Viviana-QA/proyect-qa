@@ -11,7 +11,7 @@ import { TestRunsService } from './test-runs.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectsService } from '../projects/projects.service';
-import { CreateTestRunDto, SubmitTestResultDto } from '@qa/shared-types';
+import { CreateTestRunDto, SubmitTestResultDto } from '../../shared-types';
 
 @Controller()
 @UseGuards(SupabaseAuthGuard)

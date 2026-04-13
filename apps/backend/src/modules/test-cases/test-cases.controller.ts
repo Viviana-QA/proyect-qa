@@ -13,7 +13,7 @@ import { TestCasesService } from './test-cases.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectsService } from '../projects/projects.service';
-import { CreateTestCaseDto, UpdateTestCaseDto } from '@qa/shared-types';
+import { CreateTestCaseDto, UpdateTestCaseDto } from '../../shared-types';
 
 @Controller()
 @UseGuards(SupabaseAuthGuard)
