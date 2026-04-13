@@ -1,0 +1,27 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './modules/auth/auth.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { TestSuitesModule } from './modules/test-suites/test-suites.module';
+import { TestCasesModule } from './modules/test-cases/test-cases.module';
+import { TestRunsModule } from './modules/test-runs/test-runs.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { JiraModule } from './modules/jira/jira.module';
+import { AIModule } from './modules/ai/ai.module';
+import { SupabaseModule } from './config/supabase.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    SupabaseModule,
+    AuthModule,
+    ProjectsModule,
+    TestSuitesModule,
+    TestCasesModule,
+    TestRunsModule,
+    ReportsModule,
+    JiraModule,
+    AIModule,
+  ],
+})
+export class AppModule {}

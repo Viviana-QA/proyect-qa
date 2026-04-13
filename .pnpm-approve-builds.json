@@ -1,0 +1,4 @@
+{
+  "@nestjs/core": true,
+  "esbuild": true
+}

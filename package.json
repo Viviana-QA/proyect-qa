@@ -1,0 +1,24 @@
+{
+  "name": "proyect-qa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agnostic QA Automation System with AI-powered test generation",
+  "scripts": {
+    "dev:backend": "turbo run dev --filter=backend",
+    "dev:frontend": "turbo run dev --filter=frontend",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "build:backend": "turbo run build --filter=backend",
+    "build:frontend": "turbo run build --filter=frontend",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "db:migrate": "turbo run db:migrate --filter=supabase-schema"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

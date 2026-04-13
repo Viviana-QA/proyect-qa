@@ -1,0 +1,11 @@
+{
+  "name": "@qa/supabase-schema",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "db:migrate": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:seed": "supabase db seed"
+  }
+}
