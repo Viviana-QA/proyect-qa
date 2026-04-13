@@ -41,7 +41,11 @@
       "Bash(chmod +x scripts/supabase-query.sh)",
       "Bash(npx @anthropic-ai/claude-code@latest mcp remove supabase)",
       "Bash(npx @anthropic-ai/claude-code@latest mcp add supabase -- npx -y @supabase/mcp-server-supabase@latest --supabase-access-token sbp_461051957c9a79de41c4c213708ab660e695e548 --project-ref tsnqqmsrydsfuaezkfkr --read-only)",
-      "Bash(rm -f /Users/imaginamos/Documents/proyect-qa/.git/index.lock)"
+      "Bash(rm -f /Users/imaginamos/Documents/proyect-qa/.git/index.lock)",
+      "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/projects\")",
+      "Bash(vercel logs:*)",
+      "Bash(vercel inspect:*)"
     ]
   }
 }
