@@ -45,7 +45,8 @@
       "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Content-Type: application/json\")",
       "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/projects\")",
       "Bash(vercel logs:*)",
-      "Bash(vercel inspect:*)"
+      "Bash(vercel inspect:*)",
+      "Bash(curl -s -w \"\\\\nHTTP_CODE:%{http_code}\" \"https://proyect-qa-backend.vercel.app/\")"
     ]
   }
 }
