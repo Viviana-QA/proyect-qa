@@ -49,4 +49,15 @@ export class JiraController {
       body.jira_api_token,
     );
   }
+
+  @Post('jira/projects')
+  async getProjects(
+    @Body() body: { jira_base_url: string; jira_email: string; jira_api_token: string },
+  ) {
+    return this.jiraService.getJiraProjects(
+      body.jira_base_url,
+      body.jira_email,
+      body.jira_api_token,
+    );
+  }
 }

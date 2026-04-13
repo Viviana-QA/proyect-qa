@@ -118,6 +118,24 @@ export class JiraService {
     }
   }
 
+  async getJiraProjects(
+    baseUrl: string,
+    email: string,
+    apiToken: string,
+  ): Promise<{ key: string; name: string; id: string }[]> {
+    const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+    const response = await fetch(`${baseUrl}/rest/api/3/project`, {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`Failed to fetch projects: ${response.status}`);
+    const projects = await response.json();
+    return projects.map((p: any) => ({ key: p.key, name: p.name, id: p.id }));
+  }
+
   async createIssue(
     projectId: string,
     summary: string,

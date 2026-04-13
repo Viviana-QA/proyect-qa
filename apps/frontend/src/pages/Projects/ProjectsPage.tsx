@@ -11,7 +11,22 @@ import {
   ExternalLink,
   Trash2,
   Globe,
+  Eye,
+  Layers,
+  Play,
 } from 'lucide-react';
+
+const envBorderColor: Record<string, string> = {
+  development: '#299cdb',
+  staging: '#f7b84b',
+  production: '#0ab39c',
+};
+
+const envBadgeVariant: Record<string, 'info' | 'warning' | 'success'> = {
+  development: 'info',
+  staging: 'warning',
+  production: 'success',
+};
 
 export function ProjectsPage() {
   const { data: projects, isLoading } = useProjects();
@@ -26,28 +41,36 @@ export function ProjectsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Projects</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-[#495057]">Projects</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage and monitor all your QA projects
+          </p>
+        </div>
         <Link to="/projects/new">
-          <Button>
+          <Button className="bg-[#405189] hover:bg-[#405189]/90">
             <Plus className="mr-2 h-4 w-4" />
             New Project
           </Button>
         </Link>
       </div>
 
-      <div className="relative">
+      {/* Search */}
+      <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search projects..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
+          className="pl-10 bg-white focus:bg-[#f3f3f9]"
         />
       </div>
 
+      {/* Content */}
       {isLoading ? (
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       ) : filtered?.length === 0 ? (
         <div className="py-12 text-center">
           <Globe className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -57,49 +80,83 @@ export function ProjectsPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered?.map((project) => (
-            <Card key={project.id} className="transition-shadow hover:shadow-md">
-              <CardContent className="p-6">
-                <div className="mb-4 flex items-start justify-between">
-                  <Link
-                    to={`/projects/${project.id}`}
-                    className="text-lg font-semibold hover:text-primary"
+          {filtered?.map((project) => {
+            const borderColor = envBorderColor[project.environment] || '#878a99';
+            const badgeVariant = envBadgeVariant[project.environment] || 'secondary';
+
+            return (
+              <Card
+                key={project.id}
+                className="overflow-hidden transition-shadow hover:shadow-md"
+                style={{ borderLeft: `4px solid ${borderColor}` }}
+              >
+                <CardContent className="p-5">
+                  {/* Title + badge */}
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <Link
+                      to={`/projects/${project.id}`}
+                      className="text-base font-semibold text-[#495057] hover:text-[#405189]"
+                    >
+                      {project.name}
+                    </Link>
+                    <Badge variant={badgeVariant} className="shrink-0 capitalize">
+                      {project.environment}
+                    </Badge>
+                  </div>
+
+                  {/* URL */}
+                  <a
+                    href={project.base_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#405189]"
                   >
-                    {project.name}
-                  </Link>
-                  <Badge variant="secondary">{project.environment}</Badge>
-                </div>
-                {project.description && (
-                  <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
-                    {project.description}
-                  </p>
-                )}
-                <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <ExternalLink className="h-3 w-3" />
-                  <span className="truncate">{project.base_url}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Link to={`/projects/${project.id}`}>
-                    <Button variant="outline" size="sm">
-                      View Details
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{project.base_url}</span>
+                  </a>
+
+                  {/* Mini stats */}
+                  <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Layers className="h-3 w-3" />
+                      -- suites
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Play className="h-3 w-3" />
+                      -- runs
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <Link to={`/projects/${project.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs font-medium text-[#405189] hover:bg-[rgba(64,81,137,0.1)]"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-[rgba(240,101,72,0.1)] hover:text-[#f06548]"
+                      onClick={() => {
+                        if (confirm('Delete this project?')) {
+                          deleteProject.mutate(project.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
                     </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      if (confirm('Delete this project?')) {
-                        deleteProject.mutate(project.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -6,7 +6,7 @@ import { LoginPage } from '@/pages/Auth/LoginPage';
 import { RegisterPage } from '@/pages/Auth/RegisterPage';
 import { DashboardPage } from '@/pages/Dashboard/DashboardPage';
 import { ProjectsPage } from '@/pages/Projects/ProjectsPage';
-import { NewProjectPage } from '@/pages/Projects/NewProjectPage';
+import { CreateProjectWizard } from '@/pages/Projects/CreateProjectWizard';
 import { ProjectDetailPage } from '@/pages/Projects/ProjectDetailPage';
 import { TestCasesPage } from '@/pages/TestCases/TestCasesPage';
 import { TestRunnerPage } from '@/pages/TestRunner/TestRunnerPage';
@@ -55,7 +55,7 @@ export default function App() {
         >
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/projects/new" element={<NewProjectPage />} />
+          <Route path="/projects/new" element={<CreateProjectWizard />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/projects/:projectId/test-cases" element={<TestCasesPage />} />
           <Route path="/projects/:projectId/run" element={<TestRunnerPage />} />
