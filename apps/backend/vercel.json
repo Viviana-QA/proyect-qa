@@ -2,20 +2,20 @@
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npx nest build",
-  "outputDirectory": ".",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 10,
+      "includeFiles": "dist/**"
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/index.ts"
+      "dest": "api/index.js"
     },
     {
       "src": "/(.*)",
-      "dest": "api/index.ts"
+      "dest": "api/index.js"
     }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }

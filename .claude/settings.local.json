@@ -49,7 +49,11 @@
       "Bash(curl -s -w \"\\\\nHTTP_CODE:%{http_code}\" \"https://proyect-qa-backend.vercel.app/\")",
       "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Content-Type: application/json\")",
       "Bash(curl -s \"https://proyect-qa-backend.vercel.app/\")",
-      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Authorization: Bearer invalid-token\" -H \"Content-Type: application/json\")"
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Authorization: Bearer invalid-token\" -H \"Content-Type: application/json\")",
+      "Bash(SUPABASE_URL=\"https://tsnqqmsrydsfuaezkfkr.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE\" GEMINI_API_KEY=\"AIzaSyCoHwAXVNt2P-KxnrZx_4AEqaAiD1Gt3zI\" ENCRYPTION_KEY=\"aeaf4b6890f68f852c7a711f9e533f442dee6243e7eaf2ebd03bf1e195e38dc0\" npx nest start)",
+      "Bash(curl -s \"http://localhost:3000/api/projects\")",
+      "Bash(SUPABASE_URL=\"https://tsnqqmsrydsfuaezkfkr.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE\" GEMINI_API_KEY=\"test\" ENCRYPTION_KEY=\"aeaf4b6890f68f852c7a711f9e533f442dee6243e7eaf2ebd03bf1e195e38dc0\" node dist/src/main.js)",
+      "Bash(kill %1)"
     ]
   }
 }
