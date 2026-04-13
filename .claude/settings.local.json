@@ -56,7 +56,15 @@
       "Bash(kill %1)",
       "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/projects\" -v)",
       "Bash(curl -s \"https://proyect-qa-backend.vercel.app/api/health\")",
-      "Bash(rm -f .git/index.lock)"
+      "Bash(rm -f .git/index.lock)",
+      "Bash(rm -rf .vercel)",
+      "Bash(npx nest:*)",
+      "Bash(curl -s \"https://qa-backend-iota.vercel.app/api/health\")",
+      "Bash(curl -s \"https://qa-backend-iota.vercel.app/\")",
+      "Bash(curl -s -w \"\\\\n%{http_code}\" \"https://qa-backend-iota.vercel.app/api/health\")",
+      "Bash(curl -s \"https://qa-backend-iota.vercel.app/health\")",
+      "Bash(curl -s \"https://qa-backend-iota.vercel.app/nonexistent\")",
+      "Bash(curl -s \"https://qa-backend-iota.vercel.app/api/projects\")"
     ]
   }
 }
