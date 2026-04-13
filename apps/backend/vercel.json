@@ -2,12 +2,16 @@
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npx nest build",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 10,
-      "includeFiles": "dist/**"
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["dist/**"],
+        "maxLambdaSize": "50mb"
+      }
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
