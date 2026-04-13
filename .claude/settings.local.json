@@ -47,7 +47,9 @@
       "Bash(vercel logs:*)",
       "Bash(vercel inspect:*)",
       "Bash(curl -s -w \"\\\\nHTTP_CODE:%{http_code}\" \"https://proyect-qa-backend.vercel.app/\")",
-      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Content-Type: application/json\")"
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s \"https://proyect-qa-backend.vercel.app/\")",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" \"https://proyect-qa-backend.vercel.app/api/projects\" -H \"Authorization: Bearer invalid-token\" -H \"Content-Type: application/json\")"
     ]
   }
 }
