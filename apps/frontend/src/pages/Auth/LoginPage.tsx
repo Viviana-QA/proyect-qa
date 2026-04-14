@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { TestTube2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export function LoginPage() {
       await signIn(email, password);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(err.message || t('auth.failedSignIn'));
     } finally {
       setLoading(false);
     }
@@ -35,8 +37,8 @@ export function LoginPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <TestTube2 className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle>Welcome Back</CardTitle>
-          <CardDescription>Sign in to your QA Platform account</CardDescription>
+          <CardTitle>{t('auth.welcomeBack')}</CardTitle>
+          <CardDescription>{t('auth.signInDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -46,35 +48,35 @@ export function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <label htmlFor="email" className="text-sm font-medium">{t('auth.emailLabel')}</label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <label htmlFor="password" className="text-sm font-medium">{t('auth.passwordLabel')}</label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Your password"
+                placeholder={t('auth.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link to="/register" className="text-primary hover:underline">
-              Sign up
+              {t('auth.signUp')}
             </Link>
           </p>
         </CardContent>

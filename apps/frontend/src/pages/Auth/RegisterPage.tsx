@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { TestTube2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,11 +23,11 @@ export function RegisterPage() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordMinLength'));
       return;
     }
 
@@ -34,7 +36,7 @@ export function RegisterPage() {
       await signUp(email, password);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to sign up');
+      setError(err.message || t('auth.failedSignUp'));
     } finally {
       setLoading(false);
     }
@@ -45,14 +47,14 @@ export function RegisterPage() {
       <div className="flex min-h-screen items-center justify-center bg-muted/50">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle>Check Your Email</CardTitle>
+            <CardTitle>{t('auth.checkYourEmail')}</CardTitle>
             <CardDescription>
-              We sent a confirmation link to {email}. Click it to activate your account.
+              {t('auth.confirmationSent', { email })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" onClick={() => navigate('/login')}>
-              Back to Sign In
+              {t('auth.backToSignIn')}
             </Button>
           </CardContent>
         </Card>
@@ -67,8 +69,8 @@ export function RegisterPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <TestTube2 className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Get started with AI-powered QA automation</CardDescription>
+          <CardTitle>{t('auth.createAccount')}</CardTitle>
+          <CardDescription>{t('auth.createAccountDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -78,46 +80,46 @@ export function RegisterPage() {
               </div>
             )}
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <label htmlFor="email" className="text-sm font-medium">{t('auth.emailLabel')}</label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <label htmlFor="password" className="text-sm font-medium">{t('auth.passwordLabel')}</label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Min 6 characters"
+                placeholder={t('auth.minCharacters')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.confirmPasswordLabel')}</label>
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="Repeat password"
+                placeholder={t('auth.confirmPasswordPlaceholder')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
+            {t('auth.alreadyHaveAccount')}{' '}
             <Link to="/login" className="text-primary hover:underline">
-              Sign in
+              {t('auth.signInLink')}
             </Link>
           </p>
         </CardContent>

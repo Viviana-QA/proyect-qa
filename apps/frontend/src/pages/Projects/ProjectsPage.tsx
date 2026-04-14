@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useProjects, useDeleteProject } from '@/hooks/use-projects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +30,7 @@ const envBadgeVariant: Record<string, 'info' | 'warning' | 'success'> = {
 };
 
 export function ProjectsPage() {
+  const { t } = useTranslation();
   const { data: projects, isLoading } = useProjects();
   const deleteProject = useDeleteProject();
   const [search, setSearch] = useState('');
@@ -44,15 +46,15 @@ export function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[#495057]">Projects</h1>
+          <h1 className="text-xl font-semibold text-[#495057]">{t('projects.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Manage and monitor all your QA projects
+            {t('projects.subtitle')}
           </p>
         </div>
         <Link to="/projects/new">
           <Button className="bg-[#405189] hover:bg-[#405189]/90">
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            {t('projects.newProject')}
           </Button>
         </Link>
       </div>
@@ -61,7 +63,7 @@ export function ProjectsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search projects..."
+          placeholder={t('projects.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 bg-white focus:bg-[#f3f3f9]"
@@ -70,12 +72,12 @@ export function ProjectsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">{t('projects.loading')}</p>
       ) : filtered?.length === 0 ? (
         <div className="py-12 text-center">
           <Globe className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-muted-foreground">
-            {search ? 'No projects match your search' : 'No projects yet'}
+            {search ? t('projects.noProjectsMatch') : t('projects.noProjectsYet')}
           </p>
         </div>
       ) : (
@@ -119,11 +121,11 @@ export function ProjectsPage() {
                   <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Layers className="h-3 w-3" />
-                      -- suites
+                      {t('projects.suites')}
                     </span>
                     <span className="flex items-center gap-1">
                       <Play className="h-3 w-3" />
-                      -- runs
+                      {t('projects.runs')}
                     </span>
                   </div>
 
@@ -136,7 +138,7 @@ export function ProjectsPage() {
                         className="h-8 gap-1.5 text-xs font-medium text-[#405189] hover:bg-[rgba(64,81,137,0.1)]"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        View
+                        {t('projects.view')}
                       </Button>
                     </Link>
                     <Button
@@ -144,13 +146,13 @@ export function ProjectsPage() {
                       size="sm"
                       className="h-8 gap-1.5 text-xs text-muted-foreground hover:bg-[rgba(240,101,72,0.1)] hover:text-[#f06548]"
                       onClick={() => {
-                        if (confirm('Delete this project?')) {
+                        if (confirm(t('projects.deleteConfirm'))) {
                           deleteProject.mutate(project.id);
                         }
                       }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Delete
+                      {t('projects.delete')}
                     </Button>
                   </div>
                 </CardContent>

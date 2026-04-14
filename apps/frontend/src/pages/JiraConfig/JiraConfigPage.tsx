@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { CheckCircle2, XCircle, Loader2, Bug } from 'lucide-react';
 import type { JiraConfig } from '@qa/shared-types';
 
 export function JiraConfigPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [config, setConfig] = useState<JiraConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,14 +85,14 @@ export function JiraConfigPage() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
+  if (loading) return <p className="text-muted-foreground">{t('jira.loading')}</p>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Jira Integration</h1>
+        <h1 className="text-3xl font-bold">{t('jira.title')}</h1>
         <p className="text-muted-foreground">
-          Connect your project to Jira for automatic issue creation on test failures
+          {t('jira.subtitle')}
         </p>
       </div>
 
@@ -98,19 +100,19 @@ export function JiraConfigPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bug className="h-5 w-5" />
-            Jira Configuration
-            {config && <Badge variant="success">Connected</Badge>}
+            {t('jira.configuration')}
+            {config && <Badge variant="success">{t('jira.connected')}</Badge>}
           </CardTitle>
           <CardDescription>
-            Generate an API token at id.atlassian.com/manage-profile/security/api-tokens
+            {t('jira.configDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Jira Base URL *</label>
+              <label className="text-sm font-medium">{t('jira.jiraBaseUrl')}</label>
               <Input
-                placeholder="https://yourorg.atlassian.net"
+                placeholder={t('jira.jiraBaseUrlPlaceholder')}
                 value={formData.jira_base_url}
                 onChange={(e) => setFormData({ ...formData, jira_base_url: e.target.value })}
                 required
@@ -118,10 +120,10 @@ export function JiraConfigPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email *</label>
+              <label className="text-sm font-medium">{t('jira.email')}</label>
               <Input
                 type="email"
-                placeholder="you@company.com"
+                placeholder={t('jira.emailPlaceholder')}
                 value={formData.jira_email}
                 onChange={(e) => setFormData({ ...formData, jira_email: e.target.value })}
                 required
@@ -130,11 +132,11 @@ export function JiraConfigPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                API Token * {config && '(leave empty to keep current)'}
+                {t('jira.apiToken')} {config && t('jira.apiTokenKeepCurrent')}
               </label>
               <Input
                 type="password"
-                placeholder="Your Jira API token"
+                placeholder={t('jira.apiTokenPlaceholder')}
                 value={formData.jira_api_token}
                 onChange={(e) => setFormData({ ...formData, jira_api_token: e.target.value })}
                 required={!config}
@@ -142,9 +144,9 @@ export function JiraConfigPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Project Key *</label>
+              <label className="text-sm font-medium">{t('jira.projectKey')}</label>
               <Input
-                placeholder="QA"
+                placeholder={t('jira.projectKeyPlaceholder')}
                 value={formData.jira_project_key}
                 onChange={(e) => setFormData({ ...formData, jira_project_key: e.target.value })}
                 required
@@ -153,14 +155,14 @@ export function JiraConfigPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Issue Type</label>
+                <label className="text-sm font-medium">{t('jira.issueType')}</label>
                 <Input
                   value={formData.issue_type}
                   onChange={(e) => setFormData({ ...formData, issue_type: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Label Prefix</label>
+                <label className="text-sm font-medium">{t('jira.labelPrefix')}</label>
                 <Input
                   value={formData.label_prefix}
                   onChange={(e) => setFormData({ ...formData, label_prefix: e.target.value })}
@@ -179,7 +181,7 @@ export function JiraConfigPage() {
                 className="rounded"
               />
               <label htmlFor="autoCreate" className="text-sm font-medium">
-                Automatically create Jira issues when tests fail
+                {t('jira.autoCreateOnFailure')}
               </label>
             </div>
 
@@ -200,7 +202,7 @@ export function JiraConfigPage() {
 
             <div className="flex gap-3">
               <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : 'Save Configuration'}
+                {saving ? t('jira.saving') : t('jira.saveConfiguration')}
               </Button>
               <Button
                 type="button"
@@ -211,7 +213,7 @@ export function JiraConfigPage() {
                 {testing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Test Connection
+                {t('jira.testConnection')}
               </Button>
             </div>
           </form>

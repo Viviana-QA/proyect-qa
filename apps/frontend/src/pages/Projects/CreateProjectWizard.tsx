@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useCreateProjectStore } from '@/stores/create-project.store';
 import { useCreateProject } from '@/hooks/use-projects';
 import { api } from '@/lib/api';
@@ -100,66 +101,67 @@ function Field({
 // Step 1 - Project Info
 // ===========================================================================
 function StepProjectInfo() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
 
   return (
     <div className="space-y-5">
       <SectionHeader
-        title="Project Information"
-        description="Provide the basic details about the web application you want to test."
+        title={t('wizard.step1.title')}
+        description={t('wizard.step1.description')}
       />
 
-      <Field label="Project Name" required>
+      <Field label={t('wizard.step1.projectName')} required>
         <Input
-          placeholder="My Web App"
+          placeholder={t('wizard.step1.projectNamePlaceholder')}
           value={store.name}
           onChange={(e) => store.updateField('name', e.target.value)}
         />
       </Field>
 
       <Field
-        label="Base URL"
+        label={t('wizard.step1.baseUrl')}
         required
-        hint="The root URL of the application you want to test"
+        hint={t('wizard.step1.baseUrlHint')}
       >
         <Input
           type="url"
-          placeholder="https://myapp.com"
+          placeholder={t('wizard.step1.baseUrlPlaceholder')}
           value={store.base_url}
           onChange={(e) => store.updateField('base_url', e.target.value)}
         />
       </Field>
 
-      <Field label="Project Type">
+      <Field label={t('wizard.step1.projectType')}>
         <Select
           value={store.project_type}
           onChange={(v) => store.updateField('project_type', v)}
         >
-          <option value="">Select a type...</option>
-          <option value="web_app">Web App</option>
-          <option value="ecommerce">E-commerce</option>
-          <option value="saas">SaaS</option>
-          <option value="landing_page">Landing Page</option>
-          <option value="mobile_web">Mobile Web</option>
-          <option value="api">API</option>
-          <option value="custom">Custom</option>
+          <option value="">{t('wizard.step1.selectType')}</option>
+          <option value="web_app">{t('wizard.step1.typeWebApp')}</option>
+          <option value="ecommerce">{t('wizard.step1.typeEcommerce')}</option>
+          <option value="saas">{t('wizard.step1.typeSaas')}</option>
+          <option value="landing_page">{t('wizard.step1.typeLandingPage')}</option>
+          <option value="mobile_web">{t('wizard.step1.typeMobileWeb')}</option>
+          <option value="api">{t('wizard.step1.typeApi')}</option>
+          <option value="custom">{t('wizard.step1.typeCustom')}</option>
         </Select>
       </Field>
 
-      <Field label="Environment">
+      <Field label={t('wizard.step1.environment')}>
         <Select
           value={store.environment}
           onChange={(v) => store.updateField('environment', v)}
         >
-          <option value="development">Development</option>
-          <option value="staging">Staging</option>
-          <option value="production">Production</option>
+          <option value="development">{t('wizard.step1.envDevelopment')}</option>
+          <option value="staging">{t('wizard.step1.envStaging')}</option>
+          <option value="production">{t('wizard.step1.envProduction')}</option>
         </Select>
       </Field>
 
-      <Field label="Description" hint="A brief description of your application">
+      <Field label={t('wizard.step1.descriptionLabel')} hint={t('wizard.step1.descriptionHint')}>
         <Textarea
-          placeholder="Brief description of your application"
+          placeholder={t('wizard.step1.descriptionPlaceholder')}
           value={store.description}
           onChange={(e) => store.updateField('description', e.target.value)}
         />
@@ -172,20 +174,21 @@ function StepProjectInfo() {
 // Step 2 - Authentication
 // ===========================================================================
 function StepAuthentication() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
 
   return (
     <div className="space-y-5">
       <SectionHeader
-        title="Authentication"
-        description="Configure login credentials if your application requires authentication to test."
+        title={t('wizard.step2.title')}
+        description={t('wizard.step2.description')}
       />
 
       <div className="flex items-center justify-between rounded-lg border p-4">
         <div>
-          <p className="text-sm font-medium">Does this app require login?</p>
+          <p className="text-sm font-medium">{t('wizard.step2.requiresLogin')}</p>
           <p className="text-xs text-muted-foreground">
-            Enable if testers need to authenticate before accessing the app
+            {t('wizard.step2.requiresLoginHint')}
           </p>
         </div>
         <Switch
@@ -196,31 +199,31 @@ function StepAuthentication() {
 
       {store.requires_auth && (
         <div className="space-y-5 rounded-lg border border-dashed p-4">
-          <Field label="Login URL" hint="The URL of the login page">
+          <Field label={t('wizard.step2.loginUrl')} hint={t('wizard.step2.loginUrlHint')}>
             <Input
               type="url"
-              placeholder="https://myapp.com/login"
+              placeholder={t('wizard.step2.loginUrlPlaceholder')}
               value={store.login_url}
               onChange={(e) => store.updateField('login_url', e.target.value)}
             />
           </Field>
 
-          <Field label="Authentication Type">
+          <Field label={t('wizard.step2.authType')}>
             <Select
               value={store.auth_type}
               onChange={(v) => store.updateField('auth_type', v)}
             >
-              <option value="">Select type...</option>
-              <option value="email_password">Email / Password</option>
-              <option value="oauth">OAuth</option>
-              <option value="bearer">Bearer Token</option>
-              <option value="custom">Custom</option>
+              <option value="">{t('wizard.step2.selectAuthType')}</option>
+              <option value="email_password">{t('wizard.step2.authEmailPassword')}</option>
+              <option value="oauth">{t('wizard.step2.authOAuth')}</option>
+              <option value="bearer">{t('wizard.step2.authBearer')}</option>
+              <option value="custom">{t('wizard.step2.authCustom')}</option>
             </Select>
           </Field>
 
-          <Field label="Username / Email">
+          <Field label={t('wizard.step2.usernameEmail')}>
             <Input
-              placeholder="test@example.com"
+              placeholder={t('wizard.step2.usernamePlaceholder')}
               value={store.auth_username}
               onChange={(e) =>
                 store.updateField('auth_username', e.target.value)
@@ -228,10 +231,10 @@ function StepAuthentication() {
             />
           </Field>
 
-          <Field label="Password">
+          <Field label={t('wizard.step2.password')}>
             <Input
               type="password"
-              placeholder="Enter password"
+              placeholder={t('wizard.step2.passwordPlaceholder')}
               value={store.auth_password}
               onChange={(e) =>
                 store.updateField('auth_password', e.target.value)
@@ -248,6 +251,7 @@ function StepAuthentication() {
 // Step 3 - Jira Integration
 // ===========================================================================
 function StepJira() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<
@@ -282,7 +286,7 @@ function StepJira() {
     } catch (err: unknown) {
       setTestResult('error');
       setTestError(
-        err instanceof Error ? err.message : 'Connection failed',
+        err instanceof Error ? err.message : t('wizard.step3.connectionFailed'),
       );
       store.updateField('jira_connected', false);
     } finally {
@@ -293,15 +297,15 @@ function StepJira() {
   return (
     <div className="space-y-5">
       <SectionHeader
-        title="Jira Integration"
-        description="Optionally connect to Jira to automatically create issues for failed tests."
+        title={t('wizard.step3.title')}
+        description={t('wizard.step3.description')}
       />
 
       <div className="flex items-center justify-between rounded-lg border p-4">
         <div>
-          <p className="text-sm font-medium">Connect to Jira?</p>
+          <p className="text-sm font-medium">{t('wizard.step3.connectToJira')}</p>
           <p className="text-xs text-muted-foreground">
-            Link your Jira workspace for automatic bug tracking
+            {t('wizard.step3.connectToJiraHint')}
           </p>
         </div>
         <Switch
@@ -312,9 +316,9 @@ function StepJira() {
 
       {store.connect_jira && (
         <div className="space-y-5 rounded-lg border border-dashed p-4">
-          <Field label="Jira Base URL">
+          <Field label={t('wizard.step3.jiraBaseUrl')}>
             <Input
-              placeholder="https://yourorg.atlassian.net"
+              placeholder={t('wizard.step3.jiraBaseUrlPlaceholder')}
               value={store.jira_base_url}
               onChange={(e) =>
                 store.updateField('jira_base_url', e.target.value)
@@ -322,10 +326,10 @@ function StepJira() {
             />
           </Field>
 
-          <Field label="Jira Email">
+          <Field label={t('wizard.step3.jiraEmail')}>
             <Input
               type="email"
-              placeholder="you@company.com"
+              placeholder={t('wizard.step3.jiraEmailPlaceholder')}
               value={store.jira_email}
               onChange={(e) =>
                 store.updateField('jira_email', e.target.value)
@@ -334,12 +338,12 @@ function StepJira() {
           </Field>
 
           <Field
-            label="API Token"
-            hint="Generate at id.atlassian.com/manage-profile/security/api-tokens"
+            label={t('wizard.step3.apiToken')}
+            hint={t('wizard.step3.apiTokenHint')}
           >
             <Input
               type="password"
-              placeholder="Enter Jira API token"
+              placeholder={t('wizard.step3.apiTokenPlaceholder')}
               value={store.jira_api_token}
               onChange={(e) =>
                 store.updateField('jira_api_token', e.target.value)
@@ -360,13 +364,13 @@ function StepJira() {
               }
             >
               {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Test Connection
+              {t('wizard.step3.testConnection')}
             </Button>
 
             {testResult === 'success' && (
               <span className="flex items-center gap-1 text-sm text-green-600">
                 <CheckCircle2 className="h-4 w-4" />
-                Connected successfully
+                {t('wizard.step3.connectedSuccessfully')}
               </span>
             )}
             {testResult === 'error' && (
@@ -379,14 +383,14 @@ function StepJira() {
 
           {store.jira_connected && projects.length > 0 && (
             <>
-              <Field label="Jira Project">
+              <Field label={t('wizard.step3.jiraProject')}>
                 <Select
                   value={store.jira_project_key}
                   onChange={(v) =>
                     store.updateField('jira_project_key', v)
                   }
                 >
-                  <option value="">Select a project...</option>
+                  <option value="">{t('wizard.step3.selectProject')}</option>
                   {projects.map((p) => (
                     <option key={p.key} value={p.key}>
                       {p.name} ({p.key})
@@ -395,26 +399,26 @@ function StepJira() {
                 </Select>
               </Field>
 
-              <Field label="Issue Type">
+              <Field label={t('wizard.step3.issueType')}>
                 <Select
                   value={store.jira_issue_type}
                   onChange={(v) =>
                     store.updateField('jira_issue_type', v)
                   }
                 >
-                  <option value="Bug">Bug</option>
-                  <option value="Task">Task</option>
-                  <option value="Story">Story</option>
+                  <option value="Bug">{t('wizard.step3.issueTypeBug')}</option>
+                  <option value="Task">{t('wizard.step3.issueTypeTask')}</option>
+                  <option value="Story">{t('wizard.step3.issueTypeStory')}</option>
                 </Select>
               </Field>
 
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="text-sm font-medium">
-                    Auto-create issues on failure
+                    {t('wizard.step3.autoCreateOnFailure')}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Automatically create Jira issues when tests fail
+                    {t('wizard.step3.autoCreateOnFailureHint')}
                   </p>
                 </div>
                 <Switch
@@ -436,6 +440,7 @@ function StepJira() {
 // Step 4 - Business Context
 // ===========================================================================
 function StepBusinessContext() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
 
   const complianceOptions = [
@@ -450,35 +455,35 @@ function StepBusinessContext() {
   return (
     <div className="space-y-5">
       <SectionHeader
-        title="Business Context"
-        description="Help our AI understand your application better to generate more relevant test cases."
+        title={t('wizard.step4.title')}
+        description={t('wizard.step4.description')}
       />
 
-      <Field label="Industry">
+      <Field label={t('wizard.step4.industry')}>
         <Select
           value={store.industry}
           onChange={(v) => store.updateField('industry', v)}
         >
-          <option value="">Select an industry...</option>
-          <option value="ecommerce">E-commerce</option>
-          <option value="healthcare">Healthcare</option>
-          <option value="finance">Finance</option>
-          <option value="education">Education</option>
-          <option value="social_media">Social Media</option>
-          <option value="enterprise_saas">Enterprise SaaS</option>
-          <option value="government">Government</option>
-          <option value="media">Media</option>
-          <option value="travel">Travel</option>
-          <option value="other">Other</option>
+          <option value="">{t('wizard.step4.selectIndustry')}</option>
+          <option value="ecommerce">{t('wizard.step4.industryEcommerce')}</option>
+          <option value="healthcare">{t('wizard.step4.industryHealthcare')}</option>
+          <option value="finance">{t('wizard.step4.industryFinance')}</option>
+          <option value="education">{t('wizard.step4.industryEducation')}</option>
+          <option value="social_media">{t('wizard.step4.industrySocialMedia')}</option>
+          <option value="enterprise_saas">{t('wizard.step4.industryEnterpriseSaas')}</option>
+          <option value="government">{t('wizard.step4.industryGovernment')}</option>
+          <option value="media">{t('wizard.step4.industryMedia')}</option>
+          <option value="travel">{t('wizard.step4.industryTravel')}</option>
+          <option value="other">{t('wizard.step4.industryOther')}</option>
         </Select>
       </Field>
 
       <Field
-        label="Target Audience"
-        hint="Describe who uses your application"
+        label={t('wizard.step4.targetAudience')}
+        hint={t('wizard.step4.targetAudienceHint')}
       >
         <Textarea
-          placeholder="Describe your target users..."
+          placeholder={t('wizard.step4.targetAudiencePlaceholder')}
           value={store.target_audience}
           onChange={(e) =>
             store.updateField('target_audience', e.target.value)
@@ -487,17 +492,17 @@ function StepBusinessContext() {
       </Field>
 
       <Field
-        label="Key Business Flows"
-        hint="List the critical user journeys to test"
+        label={t('wizard.step4.keyBusinessFlows')}
+        hint={t('wizard.step4.keyBusinessFlowsHint')}
       >
         <Textarea
-          placeholder="Key business flows to test, e.g.: checkout process, user registration, payment flow"
+          placeholder={t('wizard.step4.keyBusinessFlowsPlaceholder')}
           value={store.key_flows}
           onChange={(e) => store.updateField('key_flows', e.target.value)}
         />
       </Field>
 
-      <Field label="Compliance Requirements">
+      <Field label={t('wizard.step4.complianceRequirements')}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {complianceOptions.map((item) => (
             <label
@@ -515,11 +520,11 @@ function StepBusinessContext() {
       </Field>
 
       <Field
-        label="Languages"
-        hint="Comma-separated language codes to test (e.g. en, es, fr)"
+        label={t('wizard.step4.languages')}
+        hint={t('wizard.step4.languagesHint')}
       >
         <Input
-          placeholder="en, es, fr"
+          placeholder={t('wizard.step4.languagesPlaceholder')}
           value={store.languages}
           onChange={(e) => store.updateField('languages', e.target.value)}
         />
@@ -531,59 +536,60 @@ function StepBusinessContext() {
 // ===========================================================================
 // Step 5 - Test Configuration
 // ===========================================================================
-const testTypes = [
-  {
-    key: 'test_e2e',
-    label: 'E2E Testing',
-    description: 'Complete user flow validation from start to finish',
-    icon: Layers,
-  },
-  {
-    key: 'test_regression',
-    label: 'Regression Testing',
-    description: 'Full coverage regression on all features',
-    icon: RefreshCcw,
-  },
-  {
-    key: 'test_visual',
-    label: 'Visual Regression',
-    description: 'Screenshot comparison to detect UI changes',
-    icon: Image,
-  },
-  {
-    key: 'test_accessibility',
-    label: 'Accessibility',
-    description: 'WCAG compliance and accessibility audit',
-    icon: Accessibility,
-  },
-  {
-    key: 'test_performance',
-    label: 'Performance',
-    description: 'Core Web Vitals and load time metrics',
-    icon: Gauge,
-  },
-  {
-    key: 'test_api',
-    label: 'API Testing',
-    description: 'REST/GraphQL endpoint validation',
-    icon: Globe,
-  },
-  {
-    key: 'test_cross_browser',
-    label: 'Cross-browser',
-    description: 'Test across Chrome, Firefox, Safari',
-    icon: Monitor,
-  },
-  {
-    key: 'test_responsive',
-    label: 'Responsive',
-    description: 'Mobile, tablet, and desktop layouts',
-    icon: Smartphone,
-  },
-] as const;
-
 function StepTestConfig() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
+
+  const testTypes = [
+    {
+      key: 'test_e2e',
+      label: t('wizard.step5.e2eLabel'),
+      description: t('wizard.step5.e2eDesc'),
+      icon: Layers,
+    },
+    {
+      key: 'test_regression',
+      label: t('wizard.step5.regressionLabel'),
+      description: t('wizard.step5.regressionDesc'),
+      icon: RefreshCcw,
+    },
+    {
+      key: 'test_visual',
+      label: t('wizard.step5.visualLabel'),
+      description: t('wizard.step5.visualDesc'),
+      icon: Image,
+    },
+    {
+      key: 'test_accessibility',
+      label: t('wizard.step5.accessibilityLabel'),
+      description: t('wizard.step5.accessibilityDesc'),
+      icon: Accessibility,
+    },
+    {
+      key: 'test_performance',
+      label: t('wizard.step5.performanceLabel'),
+      description: t('wizard.step5.performanceDesc'),
+      icon: Gauge,
+    },
+    {
+      key: 'test_api',
+      label: t('wizard.step5.apiLabel'),
+      description: t('wizard.step5.apiDesc'),
+      icon: Globe,
+    },
+    {
+      key: 'test_cross_browser',
+      label: t('wizard.step5.crossBrowserLabel'),
+      description: t('wizard.step5.crossBrowserDesc'),
+      icon: Monitor,
+    },
+    {
+      key: 'test_responsive',
+      label: t('wizard.step5.responsiveLabel'),
+      description: t('wizard.step5.responsiveDesc'),
+      icon: Smartphone,
+    },
+  ] as const;
 
   const browserOptions = ['chromium', 'firefox', 'webkit'];
   const deviceOptions = ['mobile', 'tablet', 'desktop'];
@@ -591,8 +597,8 @@ function StepTestConfig() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Test Configuration"
-        description="Choose which types of testing to run and configure browser and device targets."
+        title={t('wizard.step5.title')}
+        description={t('wizard.step5.description')}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -634,7 +640,7 @@ function StepTestConfig() {
       </div>
 
       <div className="space-y-4 rounded-lg border p-4">
-        <Field label="Browsers">
+        <Field label={t('wizard.step5.browsers')}>
           <div className="flex flex-wrap gap-3">
             {browserOptions.map((b) => (
               <label
@@ -651,7 +657,7 @@ function StepTestConfig() {
           </div>
         </Field>
 
-        <Field label="Devices">
+        <Field label={t('wizard.step5.devices')}>
           <div className="flex flex-wrap gap-3">
             {deviceOptions.map((d) => (
               <label
@@ -707,79 +713,91 @@ function ReviewRow({
 }
 
 function StepReview() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
 
-  const enabledTests = testTypes
-    .filter(({ key }) => store[key as keyof typeof store])
-    .map(({ label }) => label);
+  const testTypeLabels: Record<string, string> = {
+    test_e2e: t('wizard.step5.e2eLabel'),
+    test_regression: t('wizard.step5.regressionLabel'),
+    test_visual: t('wizard.step5.visualLabel'),
+    test_accessibility: t('wizard.step5.accessibilityLabel'),
+    test_performance: t('wizard.step5.performanceLabel'),
+    test_api: t('wizard.step5.apiLabel'),
+    test_cross_browser: t('wizard.step5.crossBrowserLabel'),
+    test_responsive: t('wizard.step5.responsiveLabel'),
+  };
+
+  const enabledTests = Object.entries(testTypeLabels)
+    .filter(([key]) => store[key as keyof typeof store])
+    .map(([, label]) => label);
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Review & Create"
-        description="Double-check your project configuration before creating."
+        title={t('wizard.step6.title')}
+        description={t('wizard.step6.description')}
       />
 
       <div className="divide-y rounded-lg border">
         <div className="p-4">
-          <ReviewSection title="Project Info">
-            <ReviewRow label="Name" value={store.name} />
-            <ReviewRow label="URL" value={store.base_url} />
+          <ReviewSection title={t('wizard.step6.projectInfo')}>
+            <ReviewRow label={t('wizard.step6.name')} value={store.name} />
+            <ReviewRow label={t('wizard.step6.url')} value={store.base_url} />
             <ReviewRow
-              label="Type"
-              value={store.project_type || 'Not specified'}
+              label={t('wizard.step6.type')}
+              value={store.project_type || t('wizard.step6.notSpecified')}
             />
-            <ReviewRow label="Environment" value={store.environment} />
+            <ReviewRow label={t('wizard.step6.environment')} value={store.environment} />
             {store.description && (
-              <ReviewRow label="Description" value={store.description} />
+              <ReviewRow label={t('wizard.step6.descriptionLabel')} value={store.description} />
             )}
           </ReviewSection>
         </div>
 
         <div className="p-4">
-          <ReviewSection title="Authentication">
+          <ReviewSection title={t('wizard.step6.authentication')}>
             <ReviewRow
-              label="Requires Auth"
+              label={t('wizard.step6.requiresAuth')}
               value={
                 store.requires_auth ? (
-                  <Badge variant="info">Yes</Badge>
+                  <Badge variant="info">{t('common.yes')}</Badge>
                 ) : (
-                  <Badge variant="secondary">No</Badge>
+                  <Badge variant="secondary">{t('common.no')}</Badge>
                 )
               }
             />
             {store.requires_auth && (
               <>
-                <ReviewRow label="Login URL" value={store.login_url} />
-                <ReviewRow label="Auth Type" value={store.auth_type} />
-                <ReviewRow label="Username" value={store.auth_username} />
+                <ReviewRow label={t('wizard.step6.loginUrl')} value={store.login_url} />
+                <ReviewRow label={t('wizard.step6.authType')} value={store.auth_type} />
+                <ReviewRow label={t('wizard.step6.username')} value={store.auth_username} />
               </>
             )}
           </ReviewSection>
         </div>
 
         <div className="p-4">
-          <ReviewSection title="Jira Integration">
+          <ReviewSection title={t('wizard.step6.jiraIntegration')}>
             <ReviewRow
-              label="Connected"
+              label={t('wizard.step6.connected')}
               value={
                 store.connect_jira && store.jira_connected ? (
-                  <Badge variant="success">Connected</Badge>
+                  <Badge variant="success">{t('wizard.step6.connected')}</Badge>
                 ) : store.connect_jira ? (
-                  <Badge variant="warning">Not verified</Badge>
+                  <Badge variant="warning">{t('wizard.step6.notVerified')}</Badge>
                 ) : (
-                  <Badge variant="secondary">Skipped</Badge>
+                  <Badge variant="secondary">{t('wizard.step6.skipped')}</Badge>
                 )
               }
             />
             {store.connect_jira && (
               <>
-                <ReviewRow label="Jira URL" value={store.jira_base_url} />
-                <ReviewRow label="Project" value={store.jira_project_key} />
-                <ReviewRow label="Issue Type" value={store.jira_issue_type} />
+                <ReviewRow label={t('wizard.step6.jiraUrl')} value={store.jira_base_url} />
+                <ReviewRow label={t('wizard.step6.project')} value={store.jira_project_key} />
+                <ReviewRow label={t('wizard.step6.issueType')} value={store.jira_issue_type} />
                 <ReviewRow
-                  label="Auto-create"
-                  value={store.auto_create_on_failure ? 'Yes' : 'No'}
+                  label={t('wizard.step6.autoCreate')}
+                  value={store.auto_create_on_failure ? t('common.yes') : t('common.no')}
                 />
               </>
             )}
@@ -787,17 +805,17 @@ function StepReview() {
         </div>
 
         <div className="p-4">
-          <ReviewSection title="Business Context">
+          <ReviewSection title={t('wizard.step6.businessContext')}>
             <ReviewRow
-              label="Industry"
-              value={store.industry || 'Not specified'}
+              label={t('wizard.step6.industry')}
+              value={store.industry || t('wizard.step6.notSpecified')}
             />
             {store.target_audience && (
-              <ReviewRow label="Audience" value={store.target_audience} />
+              <ReviewRow label={t('wizard.step6.audience')} value={store.target_audience} />
             )}
             {store.compliance.length > 0 && (
               <ReviewRow
-                label="Compliance"
+                label={t('wizard.step6.compliance')}
                 value={
                   <div className="flex flex-wrap gap-1">
                     {store.compliance.map((c) => (
@@ -813,20 +831,20 @@ function StepReview() {
         </div>
 
         <div className="p-4">
-          <ReviewSection title="Test Configuration">
+          <ReviewSection title={t('wizard.step6.testConfiguration')}>
             <div className="flex flex-wrap gap-1 py-1">
-              {enabledTests.map((t) => (
-                <Badge key={t} variant="primarySoft">
-                  {t}
+              {enabledTests.map((tt) => (
+                <Badge key={tt} variant="primarySoft">
+                  {tt}
                 </Badge>
               ))}
             </div>
             <ReviewRow
-              label="Browsers"
+              label={t('wizard.step6.browsers')}
               value={store.browsers.join(', ')}
             />
             <ReviewRow
-              label="Devices"
+              label={t('wizard.step6.devices')}
               value={store.devices.join(', ')}
             />
           </ReviewSection>
@@ -839,19 +857,20 @@ function StepReview() {
 // ===========================================================================
 // Main Wizard
 // ===========================================================================
-const steps = [
-  { label: 'Project Info' },
-  { label: 'Authentication' },
-  { label: 'Jira' },
-  { label: 'Business Context' },
-  { label: 'Test Config' },
-  { label: 'Review' },
-];
-
 export function CreateProjectWizard() {
+  const { t } = useTranslation();
   const store = useCreateProjectStore();
   const createProject = useCreateProject();
   const navigate = useNavigate();
+
+  const steps = [
+    { label: t('wizard.step1.label') },
+    { label: t('wizard.step2.label') },
+    { label: t('wizard.step3.label') },
+    { label: t('wizard.step4.label') },
+    { label: t('wizard.step5.label') },
+    { label: t('wizard.step6.label') },
+  ];
 
   const canProceed = (): boolean => {
     switch (store.currentStep) {
@@ -967,9 +986,9 @@ export function CreateProjectWizard() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Create New Project</h1>
+        <h1 className="text-2xl font-semibold">{t('wizard.createNewProject')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Set up your web application for AI-powered QA testing
+          {t('wizard.createNewProjectDesc')}
         </p>
       </div>
 
@@ -994,20 +1013,20 @@ export function CreateProjectWizard() {
             onClick={goBack}
             disabled={store.currentStep === 0}
           >
-            Back
+            {t('wizard.back')}
           </Button>
           <Button
             variant="ghost"
             onClick={() => navigate('/projects')}
           >
-            Cancel
+            {t('wizard.cancel')}
           </Button>
         </div>
 
         <div className="flex items-center gap-3">
           {store.currentStep < steps.length - 1 ? (
             <Button onClick={goNext} disabled={!canProceed()}>
-              Next
+              {t('wizard.next')}
             </Button>
           ) : (
             <Button
@@ -1017,10 +1036,10 @@ export function CreateProjectWizard() {
               {createProject.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  {t('wizard.creating')}
                 </>
               ) : (
-                'Create Project'
+                t('wizard.createProject')
               )}
             </Button>
           )}

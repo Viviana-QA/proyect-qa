@@ -11,34 +11,47 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
-const navGroups = [
+interface NavItem {
+  nameKey: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+}
+
+interface NavGroup {
+  labelKey: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
-    label: 'MENU',
+    labelKey: 'nav.groupMenu',
     items: [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Projects', href: '/projects', icon: FolderKanban },
+      { nameKey: 'nav.dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { nameKey: 'nav.projects', href: '/projects', icon: FolderKanban },
     ],
   },
   {
-    label: 'TESTING',
+    labelKey: 'nav.groupTesting',
     items: [
-      { name: 'Test Cases', href: '/test-cases', icon: TestTube2 },
-      { name: 'Test Runner', href: '/runner', icon: Play },
-      { name: 'Reports', href: '/reports', icon: FileBarChart },
+      { nameKey: 'nav.testCases', href: '/test-cases', icon: TestTube2 },
+      { nameKey: 'nav.testRunner', href: '/runner', icon: Play },
+      { nameKey: 'nav.reports', href: '/reports', icon: FileBarChart },
     ],
   },
   {
-    label: 'INTEGRATION',
-    items: [{ name: 'Jira', href: '/jira', icon: Bug }],
+    labelKey: 'nav.groupIntegration',
+    items: [{ nameKey: 'nav.jira', href: '/jira', icon: Bug }],
   },
   {
-    label: 'CONFIG',
-    items: [{ name: 'Settings', href: '/settings', icon: Settings }],
+    labelKey: 'nav.groupConfig',
+    items: [{ nameKey: 'nav.settings', href: '/settings', icon: Settings }],
   },
 ];
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const signOut = useAuthStore((s) => s.signOut);
   const user = useAuthStore((s) => s.user);
 
@@ -46,19 +59,19 @@ export function Sidebar() {
     <div className="flex h-full w-64 flex-col bg-[#405189]">
       <div className="flex h-16 items-center gap-2 px-6">
         <TestTube2 className="h-6 w-6 text-white" />
-        <span className="text-lg font-bold text-white">QA Platform</span>
+        <span className="text-lg font-bold text-white">{t('nav.appName')}</span>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-2">
         {navGroups.map((group) => (
-          <div key={group.label}>
+          <div key={group.labelKey}>
             <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-white/40">
-              {group.label}
+              {t(group.labelKey)}
             </span>
             <div className="mt-2 space-y-1">
               {group.items.map((item) => (
                 <NavLink
-                  key={item.name}
+                  key={item.nameKey}
                   to={item.href}
                   className={({ isActive }) =>
                     cn(
@@ -70,7 +83,7 @@ export function Sidebar() {
                   }
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.name}
+                  {t(item.nameKey)}
                 </NavLink>
               ))}
             </div>
@@ -89,7 +102,7 @@ export function Sidebar() {
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
         >
           <LogOut className="h-4 w-4" />
-          Sign Out
+          {t('nav.signOut')}
         </button>
       </div>
     </div>

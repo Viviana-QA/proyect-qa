@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useProject } from '@/hooks/use-projects';
 import { useTestSuites } from '@/hooks/use-test-cases';
 import { useTestRuns } from '@/hooks/use-test-runs';
@@ -20,13 +21,14 @@ import {
 } from 'lucide-react';
 
 export function ProjectDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { data: project, isLoading } = useProject(id!);
   const { data: suites } = useTestSuites(id!);
   const { data: runs } = useTestRuns(id!);
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
-  if (!project) return <p className="text-destructive">Project not found</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">{t('projects.loading')}</p>;
+  if (!project) return <p className="text-destructive">{t('projects.projectNotFound')}</p>;
 
   const recentRuns = runs?.slice(0, 5) ?? [];
   const totalRuns = runs?.length ?? 0;
@@ -68,7 +70,7 @@ export function ProjectDetailPage() {
                 className="h-8 gap-1.5 bg-[rgba(64,81,137,0.1)] text-[#405189] hover:bg-[rgba(64,81,137,0.2)] border-0 shadow-none"
               >
                 <Brain className="h-3.5 w-3.5" />
-                Generate Tests with AI
+                {t('projects.generateTestsWithAI')}
               </Button>
             </Link>
             <Link to={`/projects/${id}/test-cases`}>
@@ -77,7 +79,7 @@ export function ProjectDetailPage() {
                 className="h-8 gap-1.5 bg-[rgba(41,156,219,0.1)] text-[#299cdb] hover:bg-[rgba(41,156,219,0.2)] border-0 shadow-none"
               >
                 <TestTube2 className="h-3.5 w-3.5" />
-                Test Cases
+                {t('projects.testCases')}
               </Button>
             </Link>
             <Link to={`/projects/${id}/run`}>
@@ -86,7 +88,7 @@ export function ProjectDetailPage() {
                 className="h-8 gap-1.5 bg-[rgba(10,179,156,0.1)] text-[#0ab39c] hover:bg-[rgba(10,179,156,0.2)] border-0 shadow-none"
               >
                 <Play className="h-3.5 w-3.5" />
-                Run Tests
+                {t('projects.runTests')}
               </Button>
             </Link>
             <Link to={`/projects/${id}/reports`}>
@@ -95,7 +97,7 @@ export function ProjectDetailPage() {
                 className="h-8 gap-1.5 bg-[rgba(247,184,75,0.1)] text-[#f7b84b] hover:bg-[rgba(247,184,75,0.2)] border-0 shadow-none"
               >
                 <FileBarChart className="h-3.5 w-3.5" />
-                Reports
+                {t('projects.reports')}
               </Button>
             </Link>
             <Link to={`/projects/${id}/jira`}>
@@ -104,7 +106,7 @@ export function ProjectDetailPage() {
                 className="h-8 gap-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 border-0 shadow-none"
               >
                 <Bug className="h-3.5 w-3.5" />
-                Jira Config
+                {t('projects.jiraConfig')}
               </Button>
             </Link>
           </div>
@@ -114,36 +116,36 @@ export function ProjectDetailPage() {
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Suites"
+          title={t('projects.totalSuites')}
           value={suites?.length ?? 0}
           icon={Layers}
           iconBg="rgba(64,81,137,0.15)"
           iconColor="#405189"
-          subtitle="Test suites"
+          subtitle={t('projects.testSuitesSubtitle')}
         />
         <StatCard
-          title="Total Runs"
+          title={t('projects.totalRuns')}
           value={totalRuns}
           icon={Activity}
           iconBg="rgba(41,156,219,0.15)"
           iconColor="#299cdb"
-          subtitle="All time"
+          subtitle={t('projects.allTime')}
         />
         <StatCard
-          title="Pass Rate"
+          title={t('projects.passRate')}
           value={totalRuns > 0 ? `${passRate}%` : '--'}
           icon={BarChart3}
           iconBg="rgba(10,179,156,0.15)"
           iconColor="#0ab39c"
-          subtitle="Completed runs"
+          subtitle={t('projects.completedRuns')}
         />
         <StatCard
-          title="Last Run"
-          value={lastRun ? formatTimeAgo(lastRun.created_at) : '--'}
+          title={t('projects.lastRun')}
+          value={lastRun ? formatTimeAgo(lastRun.created_at, t) : '--'}
           icon={Clock}
           iconBg="rgba(247,184,75,0.15)"
           iconColor="#f7b84b"
-          subtitle={lastRun ? lastRun.status : 'No runs yet'}
+          subtitle={lastRun ? lastRun.status : t('projects.noRunsYet')}
         />
       </div>
 
@@ -151,10 +153,10 @@ export function ProjectDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <CardTitle className="text-base font-semibold text-[#495057]">
-            Test Suites ({suites?.length ?? 0})
+            {t('projects.testSuites', { count: suites?.length ?? 0 })}
           </CardTitle>
           <Link to={`/projects/${id}/test-cases`} className="text-xs font-medium text-[#405189] hover:underline">
-            View All
+            {t('projects.viewAll')}
           </Link>
         </CardHeader>
         <CardContent>
@@ -162,7 +164,7 @@ export function ProjectDetailPage() {
             <div className="py-6 text-center">
               <Layers className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
-                No test suites yet. Generate tests with AI or create them manually.
+                {t('projects.noTestSuitesYet')}
               </p>
             </div>
           ) : (
@@ -170,10 +172,10 @@ export function ProjectDetailPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <th className="pb-3 pr-4">Name</th>
-                    <th className="pb-3 pr-4">Type</th>
-                    <th className="pb-3 pr-4">Source</th>
-                    <th className="pb-3 text-right">Created</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderName')}</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderType')}</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderSource')}</th>
+                    <th className="pb-3 text-right">{t('projects.tableHeaderCreated')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -187,9 +189,9 @@ export function ProjectDetailPage() {
                       </td>
                       <td className="py-3 pr-4">
                         {suite.is_ai_generated ? (
-                          <Badge variant="successSoft">AI Generated</Badge>
+                          <Badge variant="successSoft">{t('projects.aiGenerated')}</Badge>
                         ) : (
-                          <Badge variant="secondary">Manual</Badge>
+                          <Badge variant="secondary">{t('projects.manual')}</Badge>
                         )}
                       </td>
                       <td className="py-3 text-right text-xs text-muted-foreground">
@@ -207,24 +209,24 @@ export function ProjectDetailPage() {
       {/* Recent Test Runs */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-base font-semibold text-[#495057]">Recent Test Runs</CardTitle>
+          <CardTitle className="text-base font-semibold text-[#495057]">{t('projects.recentTestRuns')}</CardTitle>
         </CardHeader>
         <CardContent>
           {!recentRuns.length ? (
             <div className="py-6 text-center">
               <Play className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No test runs yet.</p>
+              <p className="text-sm text-muted-foreground">{t('projects.noTestRunsYet')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <th className="pb-3 pr-4">Status</th>
-                    <th className="pb-3 pr-4">Browser</th>
-                    <th className="pb-3 pr-4">Pass / Fail / Skip</th>
-                    <th className="pb-3 pr-4">Duration</th>
-                    <th className="pb-3 text-right">Date</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderStatus')}</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderBrowser')}</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderPassFailSkip')}</th>
+                    <th className="pb-3 pr-4">{t('projects.tableHeaderDuration')}</th>
+                    <th className="pb-3 text-right">{t('projects.tableHeaderDate')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -274,19 +276,20 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function EnvironmentBadge({ environment }: { environment: string }) {
+  const { t } = useTranslation();
   switch (environment) {
     case 'development':
-      return <Badge variant="info">Development</Badge>;
+      return <Badge variant="info">{t('common.development')}</Badge>;
     case 'staging':
-      return <Badge variant="warning">Staging</Badge>;
+      return <Badge variant="warning">{t('common.staging')}</Badge>;
     case 'production':
-      return <Badge variant="success">Production</Badge>;
+      return <Badge variant="success">{t('common.production')}</Badge>;
     default:
       return <Badge variant="secondary">{environment}</Badge>;
   }
 }
 
-function formatTimeAgo(dateStr: string): string {
+function formatTimeAgo(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -294,9 +297,9 @@ function formatTimeAgo(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffMins < 1) return t('projects.justNow');
+  if (diffMins < 60) return t('projects.minutesAgo', { count: diffMins });
+  if (diffHours < 24) return t('projects.hoursAgo', { count: diffHours });
+  if (diffDays < 7) return t('projects.daysAgo', { count: diffDays });
   return date.toLocaleDateString();
 }

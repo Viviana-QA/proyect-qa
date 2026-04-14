@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useTestCases, useDeleteTestCase } from '@/hooks/use-test-cases';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ const TEST_TYPES: TestType[] = [
 ];
 
 export function TestCasesPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [search, setSearch] = useState('');
@@ -31,10 +33,10 @@ export function TestCasesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Test Cases</h1>
+        <h1 className="text-3xl font-bold">{t('testCases.title')}</h1>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          New Test Case
+          {t('testCases.newTestCase')}
         </Button>
       </div>
 
@@ -42,7 +44,7 @@ export function TestCasesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search test cases..."
+            placeholder={t('testCases.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -53,7 +55,7 @@ export function TestCasesPage() {
           onChange={(e) => setTypeFilter(e.target.value)}
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         >
-          <option value="">All Types</option>
+          <option value="">{t('testCases.allTypes')}</option>
           {TEST_TYPES.map((t) => (
             <option key={t} value={t}>{t.replace('_', ' ').toUpperCase()}</option>
           ))}
@@ -61,11 +63,11 @@ export function TestCasesPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t('testCases.loading')}</p>
       ) : !filtered?.length ? (
         <div className="py-12 text-center">
           <Code2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-          <p className="text-muted-foreground">No test cases found</p>
+          <p className="text-muted-foreground">{t('testCases.noTestCasesFound')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -107,14 +109,14 @@ export function TestCasesPage() {
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm">
                     <Code2 className="mr-1 h-3 w-3" />
-                    Edit
+                    {t('testCases.edit')}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => {
-                      if (confirm('Delete this test case?')) {
+                      if (confirm(t('testCases.deleteConfirm'))) {
                         deleteTestCase.mutate(tc.id);
                       }
                     }}

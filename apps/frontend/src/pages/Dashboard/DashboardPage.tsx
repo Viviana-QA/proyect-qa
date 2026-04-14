@@ -18,8 +18,10 @@ import {
   Clock,
   Monitor,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const { data: projects, isLoading } = useProjects();
 
   return (
@@ -27,15 +29,15 @@ export function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[#495057]">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-[#495057]">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Welcome back! Here is your QA automation overview.
+            {t('dashboard.subtitle')}
           </p>
         </div>
         <Link to="/projects/new">
           <Button className="bg-[#405189] hover:bg-[#405189]/90">
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            {t('dashboard.newProject')}
           </Button>
         </Link>
       </div>
@@ -43,42 +45,42 @@ export function DashboardPage() {
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Projects"
+          title={t('dashboard.totalProjects')}
           value={projects?.length ?? 0}
           icon={FolderKanban}
           iconBg="rgba(64,81,137,0.15)"
           iconColor="#405189"
-          subtitle="Active projects"
+          subtitle={t('dashboard.activeProjects')}
         />
         <StatCard
-          title="Test Cases"
+          title={t('dashboard.testCases')}
           value="--"
           icon={TestTube2}
           iconBg="rgba(10,179,156,0.15)"
           iconColor="#0ab39c"
-          subtitle="Across all projects"
+          subtitle={t('dashboard.acrossAllProjects')}
         />
         <StatCard
-          title="Tests Passed"
+          title={t('dashboard.testsPassed')}
           value="--"
           icon={CheckCircle2}
           iconBg="rgba(10,179,156,0.15)"
           iconColor="#0ab39c"
-          subtitle="Last 30 days"
+          subtitle={t('dashboard.last30Days')}
         />
         <StatCard
-          title="Tests Failed"
+          title={t('dashboard.testsFailed')}
           value="--"
           icon={XCircle}
           iconBg="rgba(240,101,72,0.15)"
           iconColor="#f06548"
-          subtitle="Last 30 days"
+          subtitle={t('dashboard.last30Days')}
         />
       </div>
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-3 text-base font-semibold text-[#495057]">Quick Actions</h2>
+        <h2 className="mb-3 text-base font-semibold text-[#495057]">{t('dashboard.quickActions')}</h2>
         <div className="grid gap-4 md:grid-cols-3">
           <Link to={projects?.[0] ? `/projects/${projects[0].id}/generate` : '/projects/new'}>
             <Card className="cursor-pointer transition-shadow hover:shadow-md">
@@ -90,8 +92,8 @@ export function DashboardPage() {
                   <Brain className="h-5 w-5" style={{ color: '#405189' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#495057]">Generate AI Tests</p>
-                  <p className="text-xs text-muted-foreground">Create tests with AI assistance</p>
+                  <p className="text-sm font-semibold text-[#495057]">{t('dashboard.generateAITests')}</p>
+                  <p className="text-xs text-muted-foreground">{t('dashboard.generateAITestsDesc')}</p>
                 </div>
               </CardContent>
             </Card>
@@ -106,8 +108,8 @@ export function DashboardPage() {
                   <RotateCcw className="h-5 w-5" style={{ color: '#0ab39c' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#495057]">Run Regression</p>
-                  <p className="text-xs text-muted-foreground">Execute regression test suite</p>
+                  <p className="text-sm font-semibold text-[#495057]">{t('dashboard.runRegression')}</p>
+                  <p className="text-xs text-muted-foreground">{t('dashboard.runRegressionDesc')}</p>
                 </div>
               </CardContent>
             </Card>
@@ -122,8 +124,8 @@ export function DashboardPage() {
                   <FileBarChart className="h-5 w-5" style={{ color: '#f7b84b' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#495057]">View Reports</p>
-                  <p className="text-xs text-muted-foreground">Analyze test results and trends</p>
+                  <p className="text-sm font-semibold text-[#495057]">{t('dashboard.viewReports')}</p>
+                  <p className="text-xs text-muted-foreground">{t('dashboard.viewReportsDesc')}</p>
                 </div>
               </CardContent>
             </Card>
@@ -134,22 +136,22 @@ export function DashboardPage() {
       {/* Recent Projects */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-base font-semibold text-[#495057]">Recent Projects</CardTitle>
+          <CardTitle className="text-base font-semibold text-[#495057]">{t('dashboard.recentProjects')}</CardTitle>
           <Link to="/projects" className="text-xs font-medium text-[#405189] hover:underline">
-            View All
+            {t('dashboard.viewAll')}
           </Link>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading projects...</p>
+            <p className="text-sm text-muted-foreground">{t('dashboard.loadingProjects')}</p>
           ) : projects?.length === 0 ? (
             <div className="py-8 text-center">
               <FolderKanban className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-              <p className="text-muted-foreground">No projects yet</p>
+              <p className="text-muted-foreground">{t('dashboard.noProjectsYet')}</p>
               <Link to="/projects/new">
                 <Button variant="outline" className="mt-4">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create your first project
+                  {t('dashboard.createFirstProject')}
                 </Button>
               </Link>
             </div>
@@ -158,11 +160,11 @@ export function DashboardPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <th className="pb-3 pr-4">Name</th>
-                    <th className="pb-3 pr-4">URL</th>
-                    <th className="pb-3 pr-4">Environment</th>
-                    <th className="pb-3 pr-4">Status</th>
-                    <th className="pb-3 text-right">Actions</th>
+                    <th className="pb-3 pr-4">{t('dashboard.tableHeaderName')}</th>
+                    <th className="pb-3 pr-4">{t('dashboard.tableHeaderUrl')}</th>
+                    <th className="pb-3 pr-4">{t('dashboard.tableHeaderEnvironment')}</th>
+                    <th className="pb-3 pr-4">{t('dashboard.tableHeaderStatus')}</th>
+                    <th className="pb-3 text-right">{t('dashboard.tableHeaderActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -184,12 +186,12 @@ export function DashboardPage() {
                         <EnvironmentBadge environment={project.environment} />
                       </td>
                       <td className="py-3 pr-4">
-                        <Badge variant="successSoft">Active</Badge>
+                        <Badge variant="successSoft">{t('dashboard.statusActive')}</Badge>
                       </td>
                       <td className="py-3 text-right">
                         <Link to={`/projects/${project.id}`}>
                           <Button variant="ghost" size="sm" className="h-7 text-xs text-[#405189]">
-                            View <ArrowRight className="ml-1 h-3 w-3" />
+                            {t('dashboard.view')} <ArrowRight className="ml-1 h-3 w-3" />
                           </Button>
                         </Link>
                       </td>
@@ -205,14 +207,14 @@ export function DashboardPage() {
       {/* Recent Test Runs */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-base font-semibold text-[#495057]">Recent Test Runs</CardTitle>
+          <CardTitle className="text-base font-semibold text-[#495057]">{t('dashboard.recentTestRuns')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="py-6 text-center">
             <Clock className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No test runs yet.</p>
+            <p className="text-sm text-muted-foreground">{t('dashboard.noTestRunsYet')}</p>
             <p className="text-xs text-muted-foreground">
-              Run your first test to see results here.
+              {t('dashboard.runFirstTest')}
             </p>
           </div>
         </CardContent>
@@ -222,13 +224,14 @@ export function DashboardPage() {
 }
 
 function EnvironmentBadge({ environment }: { environment: string }) {
+  const { t } = useTranslation();
   switch (environment) {
     case 'development':
-      return <Badge variant="info">Development</Badge>;
+      return <Badge variant="info">{t('common.development')}</Badge>;
     case 'staging':
-      return <Badge variant="warning">Staging</Badge>;
+      return <Badge variant="warning">{t('common.staging')}</Badge>;
     case 'production':
-      return <Badge variant="success">Production</Badge>;
+      return <Badge variant="success">{t('common.production')}</Badge>;
     default:
       return <Badge variant="secondary">{environment}</Badge>;
   }

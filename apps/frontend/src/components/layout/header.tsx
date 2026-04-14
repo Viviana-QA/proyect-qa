@@ -1,14 +1,16 @@
 import { useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth.store';
-import { Bell, Search, User } from 'lucide-react';
+import { Bell, Search, User, Globe } from 'lucide-react';
 
 function Breadcrumb() {
+  const { t } = useTranslation();
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Home</span>
+      <span className="text-muted-foreground">{t('header.home')}</span>
       {segments.map((segment, index) => (
         <span key={segment} className="flex items-center gap-2">
           <span className="text-muted-foreground">/</span>
@@ -27,6 +29,27 @@ function Breadcrumb() {
   );
 }
 
+function LanguageSwitcher() {
+  const { i18n } = useTranslation();
+  const currentLang = i18n.language;
+
+  const toggle = () => {
+    const newLang = currentLang === 'en' ? 'es' : 'en';
+    i18n.changeLanguage(newLang);
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      title={currentLang === 'en' ? 'Cambiar a Español' : 'Switch to English'}
+    >
+      <Globe className="h-4 w-4" />
+      <span className="uppercase">{currentLang}</span>
+    </button>
+  );
+}
+
 export function Header() {
   const user = useAuthStore((s) => s.user);
 
@@ -34,7 +57,8 @@ export function Header() {
     <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm">
       <Breadcrumb />
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <LanguageSwitcher />
         <button className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <Search className="h-5 w-5" />
         </button>

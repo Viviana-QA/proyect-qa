@@ -72,7 +72,15 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" \"https://dist-theta-wine-58.vercel.app/\")",
       "Bash(pnpm add:*)",
       "Bash(ls -la /private/tmp/claude-502/-Users-imaginamos-Documents-proyect-qa/ff0e4879-599f-406c-9bfe-a7a22e1bfdc7/tasks/*.output)",
-      "Bash(curl -s -X POST https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/rpc/exec_sql -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Content-Type: application/json')"
+      "Bash(curl -s -X POST https://tsnqqmsrydsfuaezkfkr.supabase.co/rest/v1/rpc/exec_sql -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzbnFxbXNyeWRzZnVhZXprZmtyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTc2MDQ1OSwiZXhwIjoyMDkxMzM2NDU5fQ.crH9oUdSK4wfx8WEV0PCOaFW_igrGtWry_x_zP5QdnE' -H 'Content-Type: application/json')",
+      "Bash(grep -c \"tsnqqmsrydsfuaezkfkr\" /Users/imaginamos/Documents/proyect-qa/apps/frontend/dist/assets/index-*.js)",
+      "Bash(python3 -c ':*)",
+      "Bash(pip3 install:*)",
+      "Bash(/Users/imaginamos/Library/Python/3.13/bin/python3 -c \"import reportlab; print\\('ok'\\)\")",
+      "Bash(python3 -m pip install reportlab --user)",
+      "Bash(python3 -c \"import reportlab; print\\('reportlab version:', reportlab.Version\\)\")",
+      "Bash(python3 /dev/stdin)",
+      "Bash(grep -l \"useTranslation\" /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/pages/**/*.tsx /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/components/layout/*.tsx)"
     ]
   }
 }

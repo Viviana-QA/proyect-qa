@@ -1,26 +1,28 @@
 import { useAuthStore } from '@/stores/auth.store';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from 'react-i18next';
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-bold">Settings</h1>
+      <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Your account information</CardDescription>
+          <CardTitle>{t('settings.profile')}</CardTitle>
+          <CardDescription>{t('settings.profileDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Email</span>
+            <span className="text-muted-foreground">{t('settings.email')}</span>
             <span>{user?.email}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">User ID</span>
+            <span className="text-muted-foreground">{t('settings.userId')}</span>
             <code className="text-xs">{user?.id}</code>
           </div>
         </CardContent>
@@ -28,54 +30,54 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>QA Agent Setup</CardTitle>
+          <CardTitle>{t('settings.qaAgentSetup')}</CardTitle>
           <CardDescription>
-            Install and configure the local test runner agent
+            {t('settings.qaAgentSetupDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="mb-2 text-sm font-medium">1. Install the agent globally</p>
+            <p className="mb-2 text-sm font-medium">{t('settings.step1Title')}</p>
             <code className="block rounded-md bg-muted p-3 text-sm">
-              npm install -g @qa/agent
+              {t('settings.step1Command')}
             </code>
           </div>
           <div>
-            <p className="mb-2 text-sm font-medium">2. Login with your account</p>
+            <p className="mb-2 text-sm font-medium">{t('settings.step2Title')}</p>
             <code className="block rounded-md bg-muted p-3 text-sm">
-              qa-agent login
+              {t('settings.step2Command')}
             </code>
           </div>
           <div>
-            <p className="mb-2 text-sm font-medium">3. Start the agent</p>
+            <p className="mb-2 text-sm font-medium">{t('settings.step3Title')}</p>
             <code className="block rounded-md bg-muted p-3 text-sm">
-              qa-agent start
+              {t('settings.step3Command')}
             </code>
           </div>
           <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
-            The agent polls the server for pending test runs and executes them locally using Playwright.
+            {t('settings.agentInfo')}
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>API Configuration</CardTitle>
-          <CardDescription>Environment variables for your setup</CardDescription>
+          <CardTitle>{t('settings.apiConfiguration')}</CardTitle>
+          <CardDescription>{t('settings.apiConfigDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between rounded bg-muted p-2">
               <span className="font-mono">VITE_SUPABASE_URL</span>
-              <Badge variant="secondary">Required</Badge>
+              <Badge variant="secondary">{t('settings.required')}</Badge>
             </div>
             <div className="flex justify-between rounded bg-muted p-2">
               <span className="font-mono">VITE_SUPABASE_ANON_KEY</span>
-              <Badge variant="secondary">Required</Badge>
+              <Badge variant="secondary">{t('settings.required')}</Badge>
             </div>
             <div className="flex justify-between rounded bg-muted p-2">
               <span className="font-mono">VITE_API_URL</span>
-              <Badge variant="secondary">Required</Badge>
+              <Badge variant="secondary">{t('settings.required')}</Badge>
             </div>
           </div>
         </CardContent>
