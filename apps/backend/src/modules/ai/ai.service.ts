@@ -147,6 +147,23 @@ export class AIService {
     return data;
   }
 
+  async cancelJob(jobId: string) {
+    const { data, error } = await this.supabase
+      .from('ai_generation_jobs')
+      .update({
+        status: 'cancelled',
+        current_step: 'Cancelled by user',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', jobId)
+      .in('status', ['pending', 'crawling', 'analyzing', 'generating'])
+      .select()
+      .single();
+
+    if (error) throw new NotFoundException('Job not found or already completed');
+    return data;
+  }
+
   async updateJobStatus(
     jobId: string,
     status: AIGenerationJob['status'],

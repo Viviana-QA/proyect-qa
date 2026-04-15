@@ -17,114 +17,197 @@ export class GenerationWorker {
     console.log(`   ════════════════════════════════════════\n`);
 
     try {
-      // 1. Update status to 'crawling'
-      console.log('📡 Step 1/5: Updating status to crawling...');
-      await this.updateJobStatus(job.id, 'crawling', 'Exploring the website...');
-
-      // 2. Fetch project details
-      console.log('📋 Step 2/5: Fetching project details...');
+      // 1. Fetch project details
+      await this.updateJobStep(job.id, 'crawling', 'Fetching project details...');
       const project = await this.apiClient.getProject(projectId);
       console.log(`   Project: ${project.name} (${project.base_url})`);
 
-      // 3. Crawl the site
-      console.log(`[generation] Crawling ${project.base_url}...`);
-      const mainAnalysis = await crawlPage(project.base_url);
-
-      // Crawl additional pages (up to 5 from discovered routes)
-      const additionalUrls = mainAnalysis.page_routes
-        .slice(0, 5)
-        .map((route) => {
-          try {
-            return new URL(route, project.base_url).href;
-          } catch {
-            return null;
-          }
-        })
-        .filter((u): u is string => u !== null);
-
-      let allAnalyses = [mainAnalysis];
-      if (additionalUrls.length > 0) {
-        console.log(`[generation] Crawling ${additionalUrls.length} additional page(s)...`);
-        const additional = await crawlMultiplePages(additionalUrls, { maxPages: 5 });
-        allAnalyses = [...allAnalyses, ...additional];
+      // --- Kill switch check: before crawling ---
+      if (await this.isJobCancelled(job.id)) {
+        console.log('⛔ Job cancelled by user, aborting...');
+        await this.updateJobStep(job.id, 'cancelled', 'Job cancelled by user');
+        return;
       }
 
-      console.log(`[generation] Crawled ${allAnalyses.length} page(s) total`);
+      // 2. Crawl the site
+      let mainAnalysis: any;
+      let allAnalyses: any[];
+      try {
+        await this.updateJobStep(job.id, 'crawling', 'Launching Playwright browser...');
+        await this.updateJobStep(job.id, 'crawling', `Navigating to ${project.base_url}...`);
+        mainAnalysis = await crawlPage(project.base_url);
 
-      // 4. Update status to 'analyzing'
-      await this.updateJobStatus(job.id, 'analyzing', 'AI is analyzing the application structure...');
+        const additionalUrls = mainAnalysis.page_routes
+          .slice(0, 5)
+          .map((route: string) => {
+            try {
+              return new URL(route, project.base_url).href;
+            } catch {
+              return null;
+            }
+          })
+          .filter((u: string | null): u is string => u !== null);
 
-      // 5. Send to Gemini for module identification + test generation
-      const testTypes = job.test_types || ['e2e'];
-      const prompt = this.buildModuleAnalysisPrompt(project, allAnalyses, testTypes);
-      console.log('[generation] Sending crawl data to Gemini for analysis...');
-      const response = await this.geminiClient.generateModulesAndTests(prompt);
+        allAnalyses = [mainAnalysis];
 
-      // 6. Update status to 'generating'
-      await this.updateJobStatus(job.id, 'generating', 'Creating test cases...');
+        const routeCount = mainAnalysis.page_routes?.length || 0;
+        await this.updateJobStep(
+          job.id,
+          'crawling',
+          `Main page analyzed. Found ${routeCount} routes. Crawling additional pages...`,
+        );
 
-      // 7. Save modules and test cases to Supabase
+        if (additionalUrls.length > 0) {
+          const additional = await crawlMultiplePages(additionalUrls, { maxPages: 5 });
+          allAnalyses = [...allAnalyses, ...additional];
+        }
+
+        await this.updateJobStep(
+          job.id,
+          'crawling',
+          `Crawl complete. ${allAnalyses.length} page(s) analyzed.`,
+        );
+      } catch (crawlError: any) {
+        await this.updateJobStep(job.id, 'failed', `Failed to crawl site: ${crawlError.message}`);
+        throw crawlError;
+      }
+
+      // --- Kill switch check: after crawling, before analyzing ---
+      if (await this.isJobCancelled(job.id)) {
+        console.log('⛔ Job cancelled by user, aborting...');
+        await this.updateJobStep(job.id, 'cancelled', 'Job cancelled by user');
+        return;
+      }
+
+      // 3. Send to Gemini for analysis
+      let response: any;
+      try {
+        await this.updateJobStep(
+          job.id,
+          'analyzing',
+          'Sending page structure to Gemini AI for analysis...',
+        );
+
+        const testTypes = job.test_types || ['e2e'];
+        const prompt = this.buildModuleAnalysisPrompt(project, allAnalyses, testTypes);
+
+        // --- Kill switch check: before calling Gemini ---
+        if (await this.isJobCancelled(job.id)) {
+          console.log('⛔ Job cancelled by user, aborting...');
+          await this.updateJobStep(job.id, 'cancelled', 'Job cancelled by user');
+          return;
+        }
+
+        response = await this.geminiClient.generateModulesAndTests(prompt);
+
+        await this.updateJobStep(
+          job.id,
+          'analyzing',
+          `AI identified ${response.modules.length} modules. Preparing test cases...`,
+        );
+      } catch (geminiError: any) {
+        await this.updateJobStep(job.id, 'failed', `Gemini AI error: ${geminiError.message}`);
+        throw geminiError;
+      }
+
+      // --- Kill switch check: before saving modules/test cases ---
+      if (await this.isJobCancelled(job.id)) {
+        console.log('⛔ Job cancelled by user, aborting...');
+        await this.updateJobStep(job.id, 'cancelled', 'Job cancelled by user');
+        return;
+      }
+
+      // 4. Save modules and test cases to Supabase
       let modulesCreated = 0;
       let testCasesCreated = 0;
 
-      for (const module of response.modules) {
-        // Create app_module
-        const createdModule = await this.createModule(projectId, module);
-        modulesCreated++;
+      try {
+        const totalModules = response.modules.length;
 
-        // Create test_suite linked to module
-        const suite = await this.apiClient.createTestSuite(projectId, {
-          name: `${module.name} Tests`,
-          description: `AI-generated tests for ${module.name}`,
-          test_type: 'e2e',
-        });
+        for (const [index, module] of response.modules.entries()) {
+          await this.updateJobStep(
+            job.id,
+            'generating',
+            `Creating tests for module: ${module.name} (${index + 1}/${totalModules})...`,
+          );
 
-        // Link suite to the module via direct Supabase call
-        if (createdModule?.id) {
-          const supabase = this.apiClient.getSupabase();
-          await supabase
-            .from('test_suites')
-            .update({ module_id: createdModule.id })
-            .eq('id', suite.id);
-        }
+          // Create app_module
+          const createdModule = await this.createModule(projectId, module);
+          modulesCreated++;
 
-        // Create test_cases
-        for (const testCase of module.test_cases) {
-          await this.apiClient.createTestCase(projectId, {
-            suite_id: suite.id,
-            title: testCase.title,
-            description: testCase.description,
-            test_type: (testCase.test_type || 'e2e') as any,
-            playwright_code: testCase.code,
-            tags: testCase.tags || [],
-            priority: (testCase.priority || 'medium') as any,
+          // Create test_suite linked to module
+          const suite = await this.apiClient.createTestSuite(projectId, {
+            name: `${module.name} Tests`,
+            description: `AI-generated tests for ${module.name}`,
+            test_type: 'e2e',
           });
-          testCasesCreated++;
-        }
 
-        console.log(`[generation] Module "${module.name}": ${module.test_cases.length} test case(s)`);
+          // Link suite to the module via direct Supabase call
+          if (createdModule?.id) {
+            const supabase = this.apiClient.getSupabase();
+            await supabase
+              .from('test_suites')
+              .update({ module_id: createdModule.id })
+              .eq('id', suite.id);
+          }
+
+          // Create test_cases
+          for (const testCase of module.test_cases) {
+            await this.apiClient.createTestCase(projectId, {
+              suite_id: suite.id,
+              title: testCase.title,
+              description: testCase.description,
+              test_type: (testCase.test_type || 'e2e') as any,
+              playwright_code: testCase.code,
+              tags: testCase.tags || [],
+              priority: (testCase.priority || 'medium') as any,
+            });
+            testCasesCreated++;
+          }
+
+          console.log(
+            `   [generating] Module "${module.name}": ${module.test_cases.length} test case(s)`,
+          );
+        }
+      } catch (dbError: any) {
+        await this.updateJobStep(job.id, 'failed', `Failed to save results: ${dbError.message}`);
+        throw dbError;
       }
 
-      // 8. Mark as completed
-      await this.updateJobStatus(job.id, 'completed', 'Generation complete!', {
-        modules_found: modulesCreated,
-        test_cases_generated: testCasesCreated,
-        result_summary: {
-          modules: response.modules.map((m: any) => ({
-            name: m.name,
-            test_count: m.test_cases.length,
-          })),
+      // 5. Mark as completed
+      await this.updateJobStep(
+        job.id,
+        'completed',
+        `Done! ${modulesCreated} modules, ${testCasesCreated} test cases generated.`,
+        {
+          modules_found: modulesCreated,
+          test_cases_generated: testCasesCreated,
+          result_summary: {
+            modules: response.modules.map((m: any) => ({
+              name: m.name,
+              test_count: m.test_cases.length,
+            })),
+          },
         },
-      });
+      );
 
       console.log(
         `[generation] Job ${job.id} completed: ${modulesCreated} module(s), ${testCasesCreated} test case(s)`,
       );
     } catch (error: any) {
       console.error(`[generation] Job ${job.id} failed: ${error.message}`);
-      await this.updateJobStatus(job.id, 'failed', null, {
-        error_message: error.message,
-      });
+      // Only update to failed if not already marked by a specific catch block
+      const supabase = this.apiClient.getSupabase();
+      const { data } = await supabase
+        .from('ai_generation_jobs')
+        .select('status')
+        .eq('id', job.id)
+        .single();
+      if (data?.status !== 'failed') {
+        await this.updateJobStep(job.id, 'failed', `Error: ${error.message}`, {
+          error_message: error.message,
+        });
+      }
     }
   }
 
@@ -205,28 +288,51 @@ Return ONLY valid JSON matching this exact structure (no markdown fences, no ext
     return prompt;
   }
 
-  private async updateJobStatus(
+  private async updateJobStep(
     jobId: string,
     status: string,
-    message?: string | null,
+    step: string,
     extraData?: Record<string, any>,
   ): Promise<void> {
     const supabase = this.apiClient.getSupabase();
-    const update: Record<string, any> = { status };
+    const timestamp = new Date().toISOString();
+    const logEntry = { timestamp, status, step };
 
-    if (message) update.progress_message = message;
-    if (status === 'crawling') update.started_at = new Date().toISOString();
-    if (status === 'completed') update.completed_at = new Date().toISOString();
+    const update: any = {
+      status,
+      current_step: step,
+    };
+    if (status === 'crawling' && !extraData?.started_at) {
+      update.started_at = timestamp;
+    }
+    if (status === 'completed' || status === 'failed') {
+      update.completed_at = timestamp;
+    }
     if (extraData) Object.assign(update, extraData);
 
-    const { error } = await supabase
+    // Append to logs array: fetch current logs and append the new entry
+    const { data: current } = await supabase
       .from('ai_generation_jobs')
-      .update(update)
-      .eq('id', jobId);
+      .select('logs')
+      .eq('id', jobId)
+      .single();
 
-    if (error) {
-      console.error(`[generation] Failed to update job ${jobId} status: ${error.message}`);
-    }
+    const currentLogs = (current?.logs as any[]) || [];
+    currentLogs.push(logEntry);
+    update.logs = currentLogs;
+
+    await supabase.from('ai_generation_jobs').update(update).eq('id', jobId);
+    console.log(`   [${status}] ${step}`);
+  }
+
+  private async isJobCancelled(jobId: string): Promise<boolean> {
+    const supabase = this.apiClient.getSupabase();
+    const { data } = await supabase
+      .from('ai_generation_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .single();
+    return data?.status === 'cancelled';
   }
 
   private async createModule(

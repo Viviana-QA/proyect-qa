@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
-export type JobStatus = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
+export type JobStatus = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed' | 'cancelled';
 
 export interface GenerationJob {
   id: string;
@@ -30,9 +30,9 @@ export function useGenerationJob(jobId: string) {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const data = query.state.data as GenerationJob | undefined;
-      if (!data) return 3000;
-      if (data.status === 'completed' || data.status === 'failed') return false;
-      return 3000;
+      if (!data) return 2000;
+      if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') return false;
+      return 2000;
     },
   });
 
@@ -73,6 +73,14 @@ export function useLatestGenerationJob(projectId: string) {
       return jobs?.[0] ?? null;
     },
     enabled: !!projectId,
+  });
+}
+
+export function useCancelJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => api.patch(`/ai/generation-jobs/${jobId}/cancel`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['generation-jobs'] }),
   });
 }
 

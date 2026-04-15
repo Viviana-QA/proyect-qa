@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -47,5 +47,10 @@ export class AIController {
   @Get('generation-jobs/:id')
   async getJob(@Param('id') id: string) {
     return this.aiService.getJob(id);
+  }
+
+  @Patch('generation-jobs/:id/cancel')
+  async cancelJob(@Param('id') id: string) {
+    return this.aiService.cancelJob(id);
   }
 }
