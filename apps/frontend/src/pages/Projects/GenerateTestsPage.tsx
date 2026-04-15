@@ -29,6 +29,12 @@ import {
   RotateCcw,
   Eye,
   Ban,
+  AlertTriangle,
+  Copy,
+  Check,
+  Download,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 const TEST_TYPES = [
@@ -177,7 +183,7 @@ function GenerationForm({
   );
 }
 
-/* ── Job Live View (status card + terminal) ── */
+/* ── Job Live View (status card + setup guide + terminal) ── */
 function JobLiveView({
   jobId, projectId, onRetry,
 }: {
@@ -189,6 +195,24 @@ function JobLiveView({
   const navigate = useNavigate();
   const { data: job } = useGenerationJob(jobId);
   const cancelJob = useCancelJob();
+  const [pendingTooLong, setPendingTooLong] = useState(false);
+  const [pendingSeconds, setPendingSeconds] = useState(0);
+
+  // Detect if job has been pending for too long (agent not running)
+  useEffect(() => {
+    if (!job || job.status !== 'pending') {
+      setPendingTooLong(false);
+      setPendingSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      const created = new Date(job.created_at).getTime();
+      const elapsed = Math.floor((Date.now() - created) / 1000);
+      setPendingSeconds(elapsed);
+      if (elapsed > 15) setPendingTooLong(true);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [job?.id, job?.status, job?.created_at]);
 
   if (!job) {
     return (
@@ -210,6 +234,11 @@ function JobLiveView({
 
   return (
     <div className="space-y-4">
+      {/* Agent Setup Guide - shown when pending too long */}
+      {pendingTooLong && job.status === 'pending' && (
+        <AgentSetupGuide pendingSeconds={pendingSeconds} />
+      )}
+
       {/* Status Card */}
       <Card className={`border-l-4 ${getStatusBorderColor(job.status)}`}>
         <CardContent className="p-5">
@@ -368,6 +397,106 @@ function JobTerminal({ logs, isActive }: { logs: any[]; isActive: boolean }) {
           {isActive && (
             <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse mt-1" />
           )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── Agent Setup Guide ── */
+function AgentSetupGuide({ pendingSeconds }: { pendingSeconds: number }) {
+  const { t } = useTranslation();
+  const [copiedStep, setCopiedStep] = useState<number | null>(null);
+
+  const copyToClipboard = (text: string, step: number) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedStep(step);
+      setTimeout(() => setCopiedStep(null), 2000);
+    });
+  };
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://your-backend.vercel.app/api';
+
+  const steps = [
+    {
+      title: t('agentSetup.step1Title'),
+      desc: t('agentSetup.step1Desc'),
+      command: 'cd apps/agent && pnpm install && npx tsc',
+    },
+    {
+      title: t('agentSetup.step2Title'),
+      desc: t('agentSetup.step2Desc'),
+      command: `export QA_SUPABASE_URL="${supabaseUrl}"\nexport QA_SUPABASE_ANON_KEY="${supabaseKey}"\nexport QA_API_URL="${apiUrl}"\nexport QA_GEMINI_API_KEY="your-gemini-key"`,
+    },
+    {
+      title: t('agentSetup.step3Title'),
+      desc: t('agentSetup.step3Desc'),
+      command: 'node dist/index.js login',
+    },
+    {
+      title: t('agentSetup.step4Title'),
+      desc: t('agentSetup.step4Desc'),
+      command: 'node dist/index.js start',
+    },
+  ];
+
+  return (
+    <Card className="border-[#f59e0b] bg-amber-50">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+            <WifiOff className="h-5 w-5 text-[#f59e0b]" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-[#1e1b4b]">
+              {t('agentSetup.title')}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {t('agentSetup.description', { seconds: pendingSeconds })}
+            </p>
+          </div>
+          <Badge variant="warning" className="shrink-0 ml-auto">
+            {pendingSeconds}s
+          </Badge>
+        </div>
+
+        <div className="space-y-3">
+          {steps.map((step, i) => (
+            <div key={i} className="rounded-lg border border-amber-200 bg-white p-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#7c3aed] text-[10px] font-bold text-white">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm font-medium text-[#1e1b4b]">{step.title}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => copyToClipboard(step.command, i)}
+                >
+                  {copiedStep === i ? (
+                    <Check className="h-3 w-3 text-[#10b981]" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  {copiedStep === i ? t('agentSetup.copied') : t('agentSetup.copy')}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">{step.desc}</p>
+              <pre className="rounded bg-[#1e1b4b] p-2.5 text-xs text-green-400 overflow-x-auto whitespace-pre-wrap">
+                {step.command}
+              </pre>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-100 p-3 text-xs text-amber-800">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{t('agentSetup.autoDetect')}</span>
         </div>
       </CardContent>
     </Card>

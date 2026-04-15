@@ -406,7 +406,30 @@
     "noModules": "No modules discovered yet",
     "editTestCase": "Edit Test Case",
     "saveChanges": "Save Changes",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "cancelJob": "Cancel",
+    "cancelling": "Cancelling...",
+    "cancelled": "Generation Cancelled",
+    "cancelledDesc": "The generation was cancelled by the user",
+    "startNew": "Start New Generation",
+    "agentLogs": "Agent Logs",
+    "entries": "entries",
+    "waitingForOutput": "Waiting for agent output..."
+  },
+  "agentSetup": {
+    "title": "Agent Not Detected",
+    "description": "The job has been waiting {{seconds}}s with no response. The QA Agent CLI needs to be running on your machine to process this job.",
+    "step1Title": "Build the agent",
+    "step1Desc": "Navigate to the agent directory and compile",
+    "step2Title": "Set environment variables",
+    "step2Desc": "Configure Supabase and API connection (replace your-gemini-key with your actual key)",
+    "step3Title": "Login to the platform",
+    "step3Desc": "Authenticate with your email and password",
+    "step4Title": "Start the agent",
+    "step4Desc": "The agent will automatically detect and process pending jobs",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "autoDetect": "This page will automatically detect when the agent picks up the job and show progress in real-time."
   },
   "modules": {
     "title": "Application Modules",

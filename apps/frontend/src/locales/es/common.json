@@ -406,7 +406,30 @@
     "noModules": "Aun no se han descubierto modulos",
     "editTestCase": "Editar Caso de Prueba",
     "saveChanges": "Guardar Cambios",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "cancelJob": "Cancelar",
+    "cancelling": "Cancelando...",
+    "cancelled": "Generacion Cancelada",
+    "cancelledDesc": "La generacion fue cancelada por el usuario",
+    "startNew": "Iniciar Nueva Generacion",
+    "agentLogs": "Logs del Agente",
+    "entries": "entradas",
+    "waitingForOutput": "Esperando salida del agente..."
+  },
+  "agentSetup": {
+    "title": "Agente No Detectado",
+    "description": "El trabajo lleva {{seconds}}s esperando sin respuesta. El Agent CLI de QA debe estar corriendo en tu maquina para procesar este trabajo.",
+    "step1Title": "Compilar el agente",
+    "step1Desc": "Navega al directorio del agente y compila",
+    "step2Title": "Configurar variables de entorno",
+    "step2Desc": "Configura la conexion a Supabase y la API (reemplaza your-gemini-key con tu key real)",
+    "step3Title": "Iniciar sesion en la plataforma",
+    "step3Desc": "Autenticate con tu email y contrasena",
+    "step4Title": "Iniciar el agente",
+    "step4Desc": "El agente detectara y procesara automaticamente los trabajos pendientes",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "autoDetect": "Esta pagina detectara automaticamente cuando el agente recoja el trabajo y mostrara el progreso en tiempo real."
   },
   "modules": {
     "title": "Modulos de la Aplicacion",
