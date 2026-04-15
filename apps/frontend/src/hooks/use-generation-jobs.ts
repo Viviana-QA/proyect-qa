@@ -12,6 +12,8 @@ export interface GenerationJob {
   status: JobStatus;
   test_types: string[];
   progress_message: string | null;
+  current_step: string | null;
+  logs: any[];
   result_summary: any | null;
   error_message: string | null;
   modules_found: number;

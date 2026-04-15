@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useProject } from '@/hooks/use-projects';
@@ -6,7 +6,9 @@ import {
   useGenerationJob,
   useLatestGenerationJob,
   useStartGeneration,
+  useCancelJob,
   type JobStatus,
+  type GenerationJob,
 } from '@/hooks/use-generation-jobs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,11 @@ import {
   ArrowLeft,
   Sparkles,
   Loader2,
+  Terminal,
+  XOctagon,
+  RotateCcw,
+  Eye,
+  Ban,
 } from 'lucide-react';
 
 const TEST_TYPES = [
@@ -32,6 +39,16 @@ const TEST_TYPES = [
   { value: 'performance', label: 'Performance' },
   { value: 'api', label: 'API Testing' },
 ];
+
+const STATUS_PROGRESS: Record<string, number> = {
+  pending: 10,
+  crawling: 25,
+  analyzing: 50,
+  generating: 75,
+  completed: 100,
+  failed: 0,
+  cancelled: 0,
+};
 
 export function GenerateTestsPage() {
   const { t } = useTranslation();
@@ -44,34 +61,30 @@ export function GenerateTestsPage() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['e2e', 'regression']);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
-  const jobId = activeJobId || (latestJob && latestJob.status !== 'completed' && latestJob.status !== 'failed' ? latestJob.id : null);
+  const isJobActive = (s?: string) => s && !['completed', 'failed', 'cancelled'].includes(s);
+  const jobId = activeJobId || (latestJob && isJobActive(latestJob.status) ? latestJob.id : null);
+  // Also show completed/failed jobs if they're the latest
+  const showJobId = jobId || (latestJob ? latestJob.id : null);
 
-  if (projectLoading) {
-    return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
-  }
-
-  if (!project) {
-    return <p className="text-destructive">{t('projects.projectNotFound')}</p>;
-  }
+  if (projectLoading) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
+  if (!project) return <p className="text-destructive">{t('projects.projectNotFound')}</p>;
 
   const handleStart = async () => {
     try {
-      const job = await startGeneration.mutateAsync({
-        test_types: selectedTypes,
-      });
+      const job = await startGeneration.mutateAsync({ test_types: selectedTypes });
       setActiveJobId(job.id);
     } catch {
-      // error handled by mutation state
+      // handled by mutation
     }
   };
 
   const toggleType = (value: string) => {
     setSelectedTypes((prev) =>
-      prev.includes(value)
-        ? prev.filter((v) => v !== value)
-        : [...prev, value],
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
     );
   };
+
+  const showForm = !showJobId || (latestJob && ['completed', 'failed', 'cancelled'].includes(latestJob.status) && !activeJobId);
 
   return (
     <div className="space-y-6">
@@ -83,44 +96,41 @@ export function GenerateTestsPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-[#1e1b4b]">
-            {t('generation.title')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{project.name}</p>
+          <h1 className="text-xl font-semibold text-[#1e1b4b]">{t('generation.title')}</h1>
+          <p className="text-sm text-muted-foreground">{project.name} &mdash; {project.base_url}</p>
         </div>
       </div>
 
-      {jobId ? (
-        <JobProgressTracker
-          jobId={jobId}
-          projectId={id!}
-          onRetry={() => setActiveJobId(null)}
-        />
-      ) : (
+      {showForm ? (
         <GenerationForm
           selectedTypes={selectedTypes}
           onToggleType={toggleType}
           onStart={handleStart}
           isLoading={startGeneration.isPending}
         />
+      ) : null}
+
+      {showJobId && (
+        <JobLiveView
+          jobId={showJobId}
+          projectId={id!}
+          onRetry={() => setActiveJobId(null)}
+        />
       )}
     </div>
   );
 }
 
+/* ── Generation Form ── */
 function GenerationForm({
-  selectedTypes,
-  onToggleType,
-  onStart,
-  isLoading,
+  selectedTypes, onToggleType, onStart, isLoading,
 }: {
   selectedTypes: string[];
-  onToggleType: (value: string) => void;
+  onToggleType: (v: string) => void;
   onStart: () => void;
   isLoading: boolean;
 }) {
   const { t } = useTranslation();
-
   return (
     <Card>
       <CardHeader>
@@ -128,9 +138,7 @@ function GenerationForm({
           <Sparkles className="h-5 w-5 text-[#7c3aed]" />
           {t('generation.title')}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {t('generation.description')}
-        </p>
+        <p className="text-sm text-muted-foreground">{t('generation.description')}</p>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
@@ -151,24 +159,17 @@ function GenerationForm({
                   checked={selectedTypes.includes(type.value)}
                   onCheckedChange={() => onToggleType(type.value)}
                 />
-                <span className="text-sm font-medium text-[#1e1b4b]">
-                  {type.label}
-                </span>
+                <span className="text-sm font-medium text-[#1e1b4b]">{type.label}</span>
               </label>
             ))}
           </div>
         </div>
-
         <Button
           onClick={onStart}
           disabled={isLoading || selectedTypes.length === 0}
           className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9]"
         >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Brain className="h-4 w-4" />
-          )}
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
           {t('generation.startGeneration')}
         </Button>
       </CardContent>
@@ -176,10 +177,9 @@ function GenerationForm({
   );
 }
 
-function JobProgressTracker({
-  jobId,
-  projectId,
-  onRetry,
+/* ── Job Live View (status card + terminal) ── */
+function JobLiveView({
+  jobId, projectId, onRetry,
 }: {
   jobId: string;
   projectId: string;
@@ -188,6 +188,7 @@ function JobProgressTracker({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: job } = useGenerationJob(jobId);
+  const cancelJob = useCancelJob();
 
   if (!job) {
     return (
@@ -199,182 +200,251 @@ function JobProgressTracker({
     );
   }
 
+  const progress = STATUS_PROGRESS[job.status] ?? 0;
+  const isActive = !['completed', 'failed', 'cancelled'].includes(job.status);
+  const logs = (job.logs as any[]) || [];
+
+  const handleCancel = () => {
+    cancelJob.mutate(jobId);
+  };
+
   return (
     <div className="space-y-4">
-      <ProgressStep
-        status={job.status}
-        step="pending"
-        icon={Clock}
-        title={t('generation.pending')}
-        description={t('generation.pendingDesc')}
-        animationClass="animate-pulse"
-      />
-      <ProgressStep
-        status={job.status}
-        step="crawling"
-        icon={Globe}
-        title={t('generation.crawling')}
-        description={t('generation.crawlingDesc')}
-        animationClass="animate-spin"
-      />
-      <ProgressStep
-        status={job.status}
-        step="analyzing"
-        icon={Brain}
-        title={t('generation.analyzing')}
-        description={t('generation.analyzingDesc')}
-        animationClass="animate-pulse"
-      />
-      <ProgressStep
-        status={job.status}
-        step="generating"
-        icon={Code}
-        title={t('generation.generating')}
-        description={t('generation.generatingDesc')}
-        animationClass=""
-        progress={job.status === 'generating' ? 75 : job.status === 'completed' ? 100 : 50}
-      />
-
-      {job.status === 'completed' && (
-        <Card className="border-[#10b981] bg-green-50">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#10b981]/20">
-                <CheckCircle2 className="h-6 w-6 text-[#10b981]" />
-              </div>
-              <div className="flex-1">
+      {/* Status Card */}
+      <Card className={`border-l-4 ${getStatusBorderColor(job.status)}`}>
+        <CardContent className="p-5">
+          <div className="flex items-start gap-4">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${getStatusBgColor(job.status)}`}>
+              <StatusIcon status={job.status} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold text-[#1e1b4b]">
-                  {t('generation.completed')}
+                  {getStatusTitle(job.status, t)}
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <Badge variant={getStatusBadgeVariant(job.status)} className="shrink-0">
+                  {job.status}
+                </Badge>
+              </div>
+
+              {/* Current step from DB */}
+              {job.current_step && (
+                <p className="mt-1 text-sm text-[#7c3aed] font-medium">
+                  {job.current_step}
+                </p>
+              )}
+
+              {/* Progress message fallback */}
+              {!job.current_step && job.progress_message && (
+                <p className="mt-1 text-sm text-muted-foreground">{job.progress_message}</p>
+              )}
+
+              {/* Error message */}
+              {job.status === 'failed' && job.error_message && (
+                <div className="mt-2 rounded-md bg-red-100 p-3 text-sm text-[#ef4444]">
+                  <strong>Error:</strong> {job.error_message}
+                </div>
+              )}
+
+              {/* Completed summary */}
+              {job.status === 'completed' && (
+                <p className="mt-1 text-sm text-[#10b981]">
                   {t('generation.completedDesc', {
                     modules: job.modules_found,
                     testCases: job.test_cases_generated,
                   })}
                 </p>
-                <Button
-                  onClick={() => navigate(`/projects/${projectId}/modules`)}
-                  className="mt-4 gap-2 bg-[#7c3aed] hover:bg-[#6d28d9]"
-                >
-                  {t('generation.viewResults')}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              )}
 
-      {job.status === 'failed' && (
-        <Card className="border-[#ef4444] bg-red-50">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ef4444]/20">
-                <XCircle className="h-6 w-6 text-[#ef4444]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-[#1e1b4b]">
-                  {t('generation.failed')}
-                </h3>
-                {job.error_message && (
-                  <p className="mt-1 text-sm text-[#ef4444]">
-                    {job.error_message}
-                  </p>
+              {/* Cancelled message */}
+              {job.status === 'cancelled' && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('generation.cancelledDesc')}
+                </p>
+              )}
+
+              {/* Progress bar */}
+              {isActive && (
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#7c3aed]/10">
+                  <div
+                    className="h-full rounded-full bg-[#7c3aed] transition-all duration-700 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="mt-4 flex items-center gap-3">
+                {isActive && (
+                  <Button
+                    onClick={handleCancel}
+                    disabled={cancelJob.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-[#ef4444] text-[#ef4444] hover:bg-red-50"
+                  >
+                    {cancelJob.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <XOctagon className="h-3.5 w-3.5" />
+                    )}
+                    {cancelJob.isPending ? t('generation.cancelling') : t('generation.cancelJob')}
+                  </Button>
                 )}
-                <Button
-                  onClick={onRetry}
-                  variant="outline"
-                  className="mt-4 gap-2 border-[#ef4444] text-[#ef4444] hover:bg-red-50"
-                >
-                  {t('generation.retry')}
-                </Button>
+
+                {job.status === 'completed' && (
+                  <Button
+                    onClick={() => navigate(`/projects/${projectId}/modules`)}
+                    size="sm"
+                    className="gap-1.5 bg-[#7c3aed] hover:bg-[#6d28d9]"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    {t('generation.viewResults')}
+                  </Button>
+                )}
+
+                {(job.status === 'failed' || job.status === 'cancelled') && (
+                  <Button onClick={onRetry} variant="outline" size="sm" className="gap-1.5">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    {job.status === 'cancelled' ? t('generation.startNew') : t('generation.retry')}
+                  </Button>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Live Terminal */}
+      <JobTerminal logs={logs} isActive={isActive} />
     </div>
   );
 }
 
-const STEP_ORDER: JobStatus[] = ['pending', 'crawling', 'analyzing', 'generating', 'completed', 'failed'];
+/* ── Terminal Component ── */
+function JobTerminal({ logs, isActive }: { logs: any[]; isActive: boolean }) {
+  const { t } = useTranslation();
+  const termRef = useRef<HTMLDivElement>(null);
 
-function ProgressStep({
-  status,
-  step,
-  icon: Icon,
-  title,
-  description,
-  animationClass,
-  progress,
-}: {
-  status: JobStatus;
-  step: JobStatus;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  animationClass: string;
-  progress?: number;
-}) {
-  const currentIdx = STEP_ORDER.indexOf(status);
-  const stepIdx = STEP_ORDER.indexOf(step);
-  const isActive = status === step;
-  const isDone = currentIdx > stepIdx && status !== 'failed';
-  const isPending = !isActive && !isDone;
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.scrollTop = termRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
-    <Card
-      className={`transition-all duration-300 ${
-        isActive
-          ? 'border-[#7c3aed] bg-[#f5f3ff] shadow-md'
-          : isDone
-          ? 'border-[#10b981]/50 bg-green-50/50 opacity-80'
-          : 'opacity-50'
-      }`}
-    >
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isActive
-              ? 'bg-[#7c3aed]/20'
-              : isDone
-              ? 'bg-[#10b981]/20'
-              : 'bg-muted'
-          }`}
-        >
-          {isDone ? (
-            <CheckCircle2 className="h-5 w-5 text-[#10b981]" />
-          ) : (
-            <Icon
-              className={`h-5 w-5 ${
-                isActive ? `text-[#7c3aed] ${animationClass}` : 'text-muted-foreground'
-              }`}
-            />
-          )}
-        </div>
-        <div className="flex-1">
-          <h4
-            className={`text-sm font-semibold ${
-              isActive ? 'text-[#7c3aed]' : isDone ? 'text-[#10b981]' : 'text-muted-foreground'
-            }`}
-          >
-            {title}
-          </h4>
-          <p className="text-xs text-muted-foreground">{description}</p>
-          {isActive && step === 'generating' && typeof progress === 'number' && (
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#7c3aed]/20">
-              <div
-                className="h-full rounded-full bg-[#7c3aed] transition-all duration-500"
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
-            </div>
-          )}
-        </div>
-        {isActive && (
-          <Badge variant="info" className="shrink-0">
-            {isPending ? '' : isActive ? 'In progress' : ''}
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-[#1e1b4b]">
+            <Terminal className="h-4 w-4" />
+            {t('generation.agentLogs')}
+          </CardTitle>
+          <Badge variant="outline" className="text-xs">
+            {logs.length} {t('generation.entries')}
           </Badge>
-        )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div
+          ref={termRef}
+          className="rounded-md bg-[#1e1b4b] p-4 h-64 overflow-y-auto font-mono text-xs leading-relaxed"
+        >
+          {logs.length === 0 ? (
+            <p className="text-gray-500">{t('generation.waitingForOutput')}</p>
+          ) : (
+            logs.map((log: any, i: number) => (
+              <div key={i} className="flex gap-2 py-0.5">
+                <span className="text-gray-500 shrink-0">
+                  [{formatTime(log.timestamp)}]
+                </span>
+                <span className={getLogColor(log.status)}>
+                  {log.status}:
+                </span>
+                <span className="text-gray-300">{log.step}</span>
+              </div>
+            ))
+          )}
+          {isActive && (
+            <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse mt-1" />
+          )}
+        </div>
       </CardContent>
     </Card>
   );
+}
+
+/* ── Helpers ── */
+function formatTime(ts: string): string {
+  try {
+    return new Date(ts).toLocaleTimeString();
+  } catch {
+    return '--:--:--';
+  }
+}
+
+function StatusIcon({ status }: { status: string }) {
+  const cls = 'h-6 w-6';
+  switch (status) {
+    case 'pending': return <Clock className={`${cls} text-[#7c3aed] animate-pulse`} />;
+    case 'crawling': return <Globe className={`${cls} text-[#8b5cf6] animate-spin`} />;
+    case 'analyzing': return <Brain className={`${cls} text-[#7c3aed] animate-pulse`} />;
+    case 'generating': return <Code className={`${cls} text-[#7c3aed]`} />;
+    case 'completed': return <CheckCircle2 className={`${cls} text-[#10b981]`} />;
+    case 'failed': return <XCircle className={`${cls} text-[#ef4444]`} />;
+    case 'cancelled': return <Ban className={`${cls} text-gray-400`} />;
+    default: return <Loader2 className={`${cls} text-[#7c3aed] animate-spin`} />;
+  }
+}
+
+function getStatusTitle(status: string, t: any): string {
+  const map: Record<string, string> = {
+    pending: t('generation.pending'),
+    crawling: t('generation.crawling'),
+    analyzing: t('generation.analyzing'),
+    generating: t('generation.generating'),
+    completed: t('generation.completed'),
+    failed: t('generation.failed'),
+    cancelled: t('generation.cancelled'),
+  };
+  return map[status] || status;
+}
+
+function getStatusBorderColor(status: string): string {
+  switch (status) {
+    case 'completed': return 'border-[#10b981]';
+    case 'failed': return 'border-[#ef4444]';
+    case 'cancelled': return 'border-gray-300';
+    default: return 'border-[#7c3aed]';
+  }
+}
+
+function getStatusBgColor(status: string): string {
+  switch (status) {
+    case 'completed': return 'bg-[#10b981]/15';
+    case 'failed': return 'bg-[#ef4444]/15';
+    case 'cancelled': return 'bg-gray-100';
+    default: return 'bg-[#7c3aed]/15';
+  }
+}
+
+function getStatusBadgeVariant(status: string): any {
+  switch (status) {
+    case 'completed': return 'success';
+    case 'failed': return 'destructive';
+    case 'cancelled': return 'secondary';
+    default: return 'info';
+  }
+}
+
+function getLogColor(status: string): string {
+  switch (status) {
+    case 'crawling': return 'text-blue-400';
+    case 'analyzing': return 'text-purple-400';
+    case 'generating': return 'text-yellow-400';
+    case 'completed': return 'text-green-400';
+    case 'failed': return 'text-red-400';
+    case 'cancelled': return 'text-gray-400';
+    default: return 'text-gray-400';
+  }
 }
