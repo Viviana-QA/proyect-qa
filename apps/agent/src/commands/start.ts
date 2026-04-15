@@ -19,11 +19,16 @@ export async function startCommand(options: {
     process.exit(1);
   }
 
-  console.log('\nQA Platform Agent');
-  console.log(`Agent ID: ${config.agentId}`);
-  console.log(`API URL: ${config.apiUrl}`);
-  console.log(`Headless: ${config.headless}`);
-  console.log(`Browsers: ${config.browsers.join(', ')}\n`);
+  console.log('\n🚀 QA Platform Agent starting...');
+  console.log('═══════════════════════════════════════════');
+  console.log(`  Agent ID:      ${config.agentId}`);
+  console.log(`  API URL:       ${config.apiUrl}`);
+  console.log(`  Supabase URL:  ${config.supabaseUrl ? config.supabaseUrl.substring(0, 40) + '...' : '❌ MISSING!'}`);
+  console.log(`  Supabase Key:  ${config.supabaseAnonKey ? config.supabaseAnonKey.substring(0, 20) + '...' : '❌ MISSING!'}`);
+  console.log(`  Gemini Key:    ${config.geminiApiKey ? config.geminiApiKey.substring(0, 15) + '...' : '❌ MISSING!'}`);
+  console.log(`  Headless:      ${config.headless}`);
+  console.log(`  Browsers:      ${config.browsers.join(', ')}`);
+  console.log('═══════════════════════════════════════════\n');
 
   const apiClient = new ApiClient(config);
 

@@ -26,7 +26,8 @@ export class RealtimeService {
   private processingJobs = new Set<string>();
   private generationWorker: GenerationWorker | null = null;
 
-  private static readonly FALLBACK_INTERVAL_MS = 60_000;
+  // 15s for faster detection during development, increase to 60s for production
+  private static readonly FALLBACK_INTERVAL_MS = 15_000;
 
   constructor(
     private apiClient: ApiClient,
@@ -43,19 +44,72 @@ export class RealtimeService {
   async start(): Promise<void> {
     this.running = true;
 
+    console.log('🔌 Setting up Supabase Realtime subscriptions...');
     this.subscribeRealtime();
     if (this.generationWorker) {
       this.subscribeGenerationJobs();
+      console.log('🤖 AI generation worker: ENABLED');
+    } else {
+      console.log('⚠️  AI generation worker: DISABLED (no Gemini API key)');
     }
     this.startFallbackPolling();
 
-    console.log('Agent listening via Supabase Realtime (fallback poll every 60 s)');
-    if (this.generationWorker) {
-      console.log('AI generation worker enabled');
-    }
+    console.log('👂 Agent listening via Supabase Realtime (fallback poll every 60s)');
+    console.log('');
+
+    // Do an immediate poll on startup to catch any pending jobs
+    console.log('🔍 Running initial check for pending jobs...');
+    await this.immediateCheck();
 
     // Keep the process alive until stop() is called.
     await this.waitUntilStopped();
+  }
+
+  private async immediateCheck(): Promise<void> {
+    try {
+      const supabase = this.apiClient.getSupabase();
+
+      // Check for pending test runs
+      const { data: pendingRuns, error: runsError } = await supabase
+        .from('test_runs')
+        .select('id, status, project_id')
+        .eq('status', 'pending')
+        .limit(5);
+
+      if (runsError) {
+        console.error(`❌ Error querying test_runs: ${runsError.message} (code: ${runsError.code})`);
+        console.error('   This likely means RLS is blocking or the table does not exist.');
+      } else {
+        console.log(`   test_runs pending: ${pendingRuns?.length ?? 0}`);
+      }
+
+      // Check for pending generation jobs
+      const { data: pendingJobs, error: jobsError } = await supabase
+        .from('ai_generation_jobs')
+        .select('id, status, project_id')
+        .eq('status', 'pending')
+        .limit(5);
+
+      if (jobsError) {
+        console.error(`❌ Error querying ai_generation_jobs: ${jobsError.message} (code: ${jobsError.code})`);
+        console.error('   Possible causes:');
+        console.error('   1. Table "ai_generation_jobs" does not exist (run the SQL migration!)');
+        console.error('   2. RLS policies are blocking access');
+        console.error('   3. Supabase credentials are wrong');
+      } else {
+        console.log(`   ai_generation_jobs pending: ${pendingJobs?.length ?? 0}`);
+        if (pendingJobs && pendingJobs.length > 0) {
+          console.log(`🎯 Found ${pendingJobs.length} pending job(s)! Processing...`);
+          for (const job of pendingJobs) {
+            this.enqueueJob(job);
+          }
+        }
+      }
+
+      console.log('✅ Initial check complete.\n');
+    } catch (err: any) {
+      console.error(`❌ Initial check failed: ${err.message}`);
+    }
   }
 
   stop(): void {
@@ -160,12 +214,16 @@ export class RealtimeService {
         },
       )
       .subscribe((status, err) => {
+        console.log(`[realtime] ai_generation_jobs subscription status: ${status}`);
         if (status === 'SUBSCRIBED') {
-          console.log('[realtime] Subscribed to ai_generation_jobs changes');
+          console.log('✅ [realtime] Subscribed to ai_generation_jobs changes');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error(`[realtime] Generation jobs channel error: ${err?.message ?? 'unknown'}`);
+          console.error(`❌ [realtime] Generation jobs channel error: ${err?.message ?? 'unknown'}`);
+          console.error('   Check: Is Realtime enabled on ai_generation_jobs in Supabase?');
         } else if (status === 'TIMED_OUT') {
-          console.warn('[realtime] Generation jobs subscription timed out');
+          console.warn('⚠️  [realtime] Generation jobs subscription timed out');
+        } else if (status === 'CLOSED') {
+          console.warn('⚠️  [realtime] Generation jobs channel closed');
         }
       });
   }
@@ -186,36 +244,44 @@ export class RealtimeService {
     this.fallbackTimer = setInterval(async () => {
       if (!this.running) return;
 
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`\n⏱️  [${timestamp}] Fallback poll running...`);
+
       try {
         const pendingRuns = await this.apiClient.getPendingRuns();
+        console.log(`   test_runs pending: ${pendingRuns.length}`);
         if (pendingRuns.length > 0) {
-          console.log(`[fallback] Found ${pendingRuns.length} pending run(s)`);
           for (const run of pendingRuns) {
             this.enqueueRun(run);
           }
         }
       } catch (error: any) {
-        console.error(`[fallback] Poll error: ${error.message}`);
+        console.error(`   ❌ test_runs poll error: ${error.message}`);
       }
 
       // Also poll for pending generation jobs
       if (this.generationWorker) {
         try {
           const supabase = this.apiClient.getSupabase();
-          const { data: pendingJobs } = await supabase
+          const { data: pendingJobs, error: jobsErr } = await supabase
             .from('ai_generation_jobs')
             .select('*')
             .eq('status', 'pending')
             .limit(5);
 
-          if (pendingJobs && pendingJobs.length > 0) {
-            console.log(`[fallback] Found ${pendingJobs.length} pending generation job(s)`);
-            for (const job of pendingJobs) {
-              this.enqueueJob(job);
+          if (jobsErr) {
+            console.error(`   ❌ ai_generation_jobs poll error: ${jobsErr.message} (${jobsErr.code})`);
+          } else {
+            console.log(`   ai_generation_jobs pending: ${pendingJobs?.length ?? 0}`);
+            if (pendingJobs && pendingJobs.length > 0) {
+              console.log(`   🎯 Processing ${pendingJobs.length} job(s)...`);
+              for (const job of pendingJobs) {
+                this.enqueueJob(job);
+              }
             }
           }
         } catch (error: any) {
-          console.error(`[fallback] Generation jobs poll error: ${error.message}`);
+          console.error(`   ❌ Generation jobs poll error: ${error.message}`);
         }
       }
     }, RealtimeService.FALLBACK_INTERVAL_MS);

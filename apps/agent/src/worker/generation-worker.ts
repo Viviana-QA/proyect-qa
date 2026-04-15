@@ -10,13 +10,21 @@ export class GenerationWorker {
 
   async processJob(job: any): Promise<void> {
     const projectId = job.project_id;
+    console.log(`\n🤖 ════════════════════════════════════════`);
+    console.log(`   Processing generation job: ${job.id}`);
+    console.log(`   Project ID: ${projectId}`);
+    console.log(`   Test types: ${JSON.stringify(job.test_types)}`);
+    console.log(`   ════════════════════════════════════════\n`);
 
     try {
       // 1. Update status to 'crawling'
+      console.log('📡 Step 1/5: Updating status to crawling...');
       await this.updateJobStatus(job.id, 'crawling', 'Exploring the website...');
 
       // 2. Fetch project details
+      console.log('📋 Step 2/5: Fetching project details...');
       const project = await this.apiClient.getProject(projectId);
+      console.log(`   Project: ${project.name} (${project.base_url})`);
 
       // 3. Crawl the site
       console.log(`[generation] Crawling ${project.base_url}...`);
