@@ -1,6 +1,7 @@
 import { loadConfig } from '../config/agent-config';
 import { ApiClient } from '../connection/api-client';
 import { PlaywrightRunner } from '../runner/playwright-runner';
+import { GeminiClient } from '../ai/gemini-client';
 import { RealtimeService } from '../connection/polling-service';
 
 export async function startCommand(options: {
@@ -35,7 +36,17 @@ export async function startCommand(options: {
   console.log('Session restored successfully');
 
   const runner = new PlaywrightRunner(config);
-  const realtime = new RealtimeService(apiClient, runner);
+
+  // Initialize Gemini client for AI generation jobs (optional - works without it)
+  let geminiClient: GeminiClient | undefined;
+  if (config.geminiApiKey) {
+    geminiClient = new GeminiClient(config.geminiApiKey);
+    console.log('Gemini API key configured - AI generation worker enabled');
+  } else {
+    console.log('No Gemini API key - AI generation worker disabled');
+  }
+
+  const realtime = new RealtimeService(apiClient, runner, geminiClient);
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {

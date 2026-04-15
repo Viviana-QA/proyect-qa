@@ -1,6 +1,8 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { ApiClient } from './api-client';
 import { PlaywrightRunner } from '../runner/playwright-runner';
+import { GeminiClient } from '../ai/gemini-client';
+import { GenerationWorker } from '../worker/generation-worker';
 import type { TestRun } from '@qa/shared-types';
 
 /**
@@ -18,15 +20,23 @@ import type { TestRun } from '@qa/shared-types';
 export class RealtimeService {
   private running = false;
   private channel: RealtimeChannel | null = null;
+  private generationChannel: RealtimeChannel | null = null;
   private fallbackTimer: ReturnType<typeof setInterval> | null = null;
   private processing = new Set<string>();
+  private processingJobs = new Set<string>();
+  private generationWorker: GenerationWorker | null = null;
 
   private static readonly FALLBACK_INTERVAL_MS = 60_000;
 
   constructor(
     private apiClient: ApiClient,
     private runner: PlaywrightRunner,
-  ) {}
+    private geminiClient?: GeminiClient,
+  ) {
+    if (geminiClient) {
+      this.generationWorker = new GenerationWorker(apiClient, geminiClient);
+    }
+  }
 
   // ----- public API -----
 
@@ -34,9 +44,15 @@ export class RealtimeService {
     this.running = true;
 
     this.subscribeRealtime();
+    if (this.generationWorker) {
+      this.subscribeGenerationJobs();
+    }
     this.startFallbackPolling();
 
     console.log('Agent listening via Supabase Realtime (fallback poll every 60 s)');
+    if (this.generationWorker) {
+      console.log('AI generation worker enabled');
+    }
 
     // Keep the process alive until stop() is called.
     await this.waitUntilStopped();
@@ -49,6 +65,11 @@ export class RealtimeService {
     if (this.channel) {
       this.apiClient.getSupabase().removeChannel(this.channel);
       this.channel = null;
+    }
+
+    if (this.generationChannel) {
+      this.apiClient.getSupabase().removeChannel(this.generationChannel);
+      this.generationChannel = null;
     }
 
     if (this.fallbackTimer) {
@@ -103,6 +124,62 @@ export class RealtimeService {
       });
   }
 
+  // ----- Generation jobs subscription -----
+
+  private subscribeGenerationJobs(): void {
+    const supabase = this.apiClient.getSupabase();
+
+    this.generationChannel = supabase
+      .channel('generation-jobs-pending')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ai_generation_jobs',
+          filter: 'status=eq.pending',
+        },
+        (payload) => {
+          const job = payload.new as any;
+          console.log(`[realtime] New pending generation job detected: ${job.id}`);
+          this.enqueueJob(job);
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'ai_generation_jobs',
+          filter: 'status=eq.pending',
+        },
+        (payload) => {
+          const job = payload.new as any;
+          console.log(`[realtime] Generation job updated to pending: ${job.id}`);
+          this.enqueueJob(job);
+        },
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[realtime] Subscribed to ai_generation_jobs changes');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`[realtime] Generation jobs channel error: ${err?.message ?? 'unknown'}`);
+        } else if (status === 'TIMED_OUT') {
+          console.warn('[realtime] Generation jobs subscription timed out');
+        }
+      });
+  }
+
+  private enqueueJob(job: any): void {
+    if (!this.running || !this.generationWorker) return;
+    if (this.processingJobs.has(job.id)) return;
+
+    this.processingJobs.add(job.id);
+    this.generationWorker.processJob(job).finally(() => {
+      this.processingJobs.delete(job.id);
+    });
+  }
+
   // ----- Fallback polling (60 s) -----
 
   private startFallbackPolling(): void {
@@ -119,6 +196,27 @@ export class RealtimeService {
         }
       } catch (error: any) {
         console.error(`[fallback] Poll error: ${error.message}`);
+      }
+
+      // Also poll for pending generation jobs
+      if (this.generationWorker) {
+        try {
+          const supabase = this.apiClient.getSupabase();
+          const { data: pendingJobs } = await supabase
+            .from('ai_generation_jobs')
+            .select('*')
+            .eq('status', 'pending')
+            .limit(5);
+
+          if (pendingJobs && pendingJobs.length > 0) {
+            console.log(`[fallback] Found ${pendingJobs.length} pending generation job(s)`);
+            for (const job of pendingJobs) {
+              this.enqueueJob(job);
+            }
+          }
+        } catch (error: any) {
+          console.error(`[fallback] Generation jobs poll error: ${error.message}`);
+        }
       }
     }, RealtimeService.FALLBACK_INTERVAL_MS);
   }

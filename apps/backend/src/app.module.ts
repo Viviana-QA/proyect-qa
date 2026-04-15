@@ -9,6 +9,7 @@ import { TestRunsModule } from './modules/test-runs/test-runs.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { JiraModule } from './modules/jira/jira.module';
 import { AIModule } from './modules/ai/ai.module';
+import { ModulesModule } from './modules/modules/modules.module';
 import { SupabaseModule } from './config/supabase.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { SupabaseModule } from './config/supabase.module';
     ReportsModule,
     JiraModule,
     AIModule,
+    ModulesModule,
   ],
 })
 export class AppModule {}

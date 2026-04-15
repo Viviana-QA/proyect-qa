@@ -385,6 +385,37 @@
     "apiConfigDescription": "Variables de entorno para tu configuracion",
     "required": "Requerido"
   },
+  "generation": {
+    "title": "Generar Pruebas con IA",
+    "description": "La IA explorara tu sitio web y creara casos de prueba automaticamente",
+    "selectTestTypes": "Selecciona los tipos de prueba a generar",
+    "startGeneration": "Iniciar Generacion",
+    "pending": "Esperando al agente...",
+    "pendingDesc": "Asegurate de que qa-agent este ejecutandose localmente",
+    "crawling": "Explorando el sitio web...",
+    "crawlingDesc": "Playwright esta navegando por tu aplicacion",
+    "analyzing": "La IA esta analizando la estructura...",
+    "analyzingDesc": "Gemini esta identificando modulos y patrones",
+    "generating": "Creando casos de prueba...",
+    "generatingDesc": "Escribiendo scripts de prueba con Playwright",
+    "completed": "Generacion Completada!",
+    "completedDesc": "{{modules}} modulos encontrados, {{testCases}} casos de prueba generados",
+    "failed": "Generacion Fallida",
+    "retry": "Reintentar",
+    "viewResults": "Ver Resultados",
+    "noModules": "Aun no se han descubierto modulos",
+    "editTestCase": "Editar Caso de Prueba",
+    "saveChanges": "Guardar Cambios",
+    "cancel": "Cancelar"
+  },
+  "modules": {
+    "title": "Modulos de la Aplicacion",
+    "subtitle": "Modulos logicos descubiertos por la IA",
+    "testCases": "Casos de Prueba",
+    "discoveredUrls": "URLs Descubiertas",
+    "elements": "Elementos",
+    "noTestCases": "No hay casos de prueba en este modulo"
+  },
   "common": {
     "loading": "Cargando...",
     "save": "Guardar",

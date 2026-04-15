@@ -1,7 +1,11 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
-import { AIGenerateRequest, AIRefineRequest } from '../../shared-types';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import {
+  AIRefineRequest,
+  CreateGenerationJobDto,
+} from '../../shared-types';
 
 @Controller('ai')
 @UseGuards(SupabaseAuthGuard)
@@ -9,8 +13,18 @@ export class AIController {
   constructor(private readonly aiService: AIService) {}
 
   @Post('generate-tests')
-  async generateTests(@Body() request: AIGenerateRequest) {
-    return this.aiService.generateTests(request);
+  async generateTests(
+    @Body() body: CreateGenerationJobDto & { project_id: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    // Create a job record with status='pending' and return immediately.
+    // The actual AI generation is handled by the agent, not this endpoint.
+    const job = await this.aiService.createGenerationJob(
+      body.project_id,
+      userId,
+      body.test_types,
+    );
+    return job;
   }
 
   @Post('refine-test')
@@ -23,5 +37,15 @@ export class AIController {
     @Body() body: { url: string; page_data: string },
   ) {
     return this.aiService.analyzeUrl(body.url, body.page_data);
+  }
+
+  @Get('generation-jobs/project/:projectId')
+  async getJobsByProject(@Param('projectId') projectId: string) {
+    return this.aiService.getJobsByProject(projectId);
+  }
+
+  @Get('generation-jobs/:id')
+  async getJob(@Param('id') id: string) {
+    return this.aiService.getJob(id);
   }
 }

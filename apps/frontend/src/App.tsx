@@ -8,6 +8,9 @@ import { DashboardPage } from '@/pages/Dashboard/DashboardPage';
 import { ProjectsPage } from '@/pages/Projects/ProjectsPage';
 import { CreateProjectWizard } from '@/pages/Projects/CreateProjectWizard';
 import { ProjectDetailPage } from '@/pages/Projects/ProjectDetailPage';
+import { GenerateTestsPage } from '@/pages/Projects/GenerateTestsPage';
+import { ModulesListPage } from '@/pages/Projects/ModulesListPage';
+import { ModuleDetailPage } from '@/pages/Projects/ModuleDetailPage';
 import { TestCasesPage } from '@/pages/TestCases/TestCasesPage';
 import { TestRunnerPage } from '@/pages/TestRunner/TestRunnerPage';
 import { ReportsPage } from '@/pages/Reports/ReportsPage';
@@ -57,6 +60,9 @@ export default function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/new" element={<CreateProjectWizard />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/projects/:id/generate" element={<GenerateTestsPage />} />
+          <Route path="/projects/:projectId/modules" element={<ModulesListPage />} />
+          <Route path="/projects/:projectId/modules/:moduleId" element={<ModuleDetailPage />} />
           <Route path="/projects/:projectId/test-cases" element={<TestCasesPage />} />
           <Route path="/projects/:projectId/run" element={<TestRunnerPage />} />
           <Route path="/projects/:projectId/reports" element={<ReportsPage />} />

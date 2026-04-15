@@ -13,12 +13,36 @@ export interface BusinessContext {
   compliance?: string[];
 }
 
+export interface ModuleAnalysisResponse {
+  modules: Array<{
+    name: string;
+    description: string;
+    urls: string[];
+    element_count: number;
+    test_cases: Array<{
+      title: string;
+      description: string;
+      code: string;
+      test_type: string;
+      priority: string;
+      tags: string[];
+    }>;
+  }>;
+}
+
 export class GeminiClient {
   private model;
+  private jsonModel;
 
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    this.jsonModel = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash-lite',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    });
   }
 
   async generateTests(
@@ -38,6 +62,13 @@ export class GeminiClient {
     const text = result.response.text();
 
     return this.parseGeneratedTests(text);
+  }
+
+  async generateModulesAndTests(prompt: string): Promise<ModuleAnalysisResponse> {
+    const result = await this.jsonModel.generateContent(prompt);
+    const text = result.response.text();
+
+    return this.parseModuleAnalysisResponse(text);
   }
 
   async healTest(
@@ -213,5 +244,47 @@ Return ONLY the fixed Playwright test code. No markdown fences, no explanations,
       throw new Error('AI returned empty healed code');
     }
     return cleaned;
+  }
+
+  private parseModuleAnalysisResponse(text: string): ModuleAnalysisResponse {
+    let cleaned = text.trim();
+    // Strip markdown code fences if present
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+
+    try {
+      const parsed = JSON.parse(cleaned);
+
+      // Handle case where response is the modules array directly
+      const modules = Array.isArray(parsed) ? parsed : parsed.modules;
+
+      if (!Array.isArray(modules)) {
+        throw new Error('Expected "modules" array in response');
+      }
+
+      return {
+        modules: modules.map((m: any) => ({
+          name: m.name || 'Unnamed Module',
+          description: m.description || '',
+          urls: m.urls || [],
+          element_count: m.element_count || 0,
+          test_cases: Array.isArray(m.test_cases)
+            ? m.test_cases.map((tc: any) => ({
+                title: tc.title || 'Untitled Test',
+                description: tc.description || '',
+                code: tc.code || tc.playwright_code || '',
+                test_type: tc.test_type || 'e2e',
+                priority: tc.priority || 'medium',
+                tags: tc.tags || [],
+              }))
+            : [],
+        })),
+      };
+    } catch (error: any) {
+      console.error('Failed to parse module analysis response:', error.message);
+      console.error('Raw response (first 500 chars):', cleaned.substring(0, 500));
+      throw new Error(`Failed to parse module analysis response: ${error.message}`);
+    }
   }
 }

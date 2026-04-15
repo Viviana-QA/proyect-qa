@@ -385,6 +385,37 @@
     "apiConfigDescription": "Environment variables for your setup",
     "required": "Required"
   },
+  "generation": {
+    "title": "Generate Tests with AI",
+    "description": "AI will explore your website and create test cases automatically",
+    "selectTestTypes": "Select test types to generate",
+    "startGeneration": "Start Generation",
+    "pending": "Waiting for agent...",
+    "pendingDesc": "Make sure qa-agent is running locally",
+    "crawling": "Exploring the website...",
+    "crawlingDesc": "Playwright is navigating through your application",
+    "analyzing": "AI is analyzing the structure...",
+    "analyzingDesc": "Gemini is identifying modules and patterns",
+    "generating": "Creating test cases...",
+    "generatingDesc": "Writing Playwright test scripts",
+    "completed": "Generation Complete!",
+    "completedDesc": "{{modules}} modules found, {{testCases}} test cases generated",
+    "failed": "Generation Failed",
+    "retry": "Retry",
+    "viewResults": "View Results",
+    "noModules": "No modules discovered yet",
+    "editTestCase": "Edit Test Case",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel"
+  },
+  "modules": {
+    "title": "Application Modules",
+    "subtitle": "Logical modules discovered by AI",
+    "testCases": "Test Cases",
+    "discoveredUrls": "Discovered URLs",
+    "elements": "Elements",
+    "noTestCases": "No test cases in this module"
+  },
   "common": {
     "loading": "Loading...",
     "save": "Save",
