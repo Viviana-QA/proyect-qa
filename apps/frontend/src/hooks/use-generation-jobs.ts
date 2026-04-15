@@ -8,13 +8,17 @@ export type JobStatus = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'c
 export interface GenerationJob {
   id: string;
   project_id: string;
+  triggered_by: string;
   status: JobStatus;
-  progress: number;
+  test_types: string[];
+  progress_message: string | null;
+  result_summary: any | null;
+  error_message: string | null;
   modules_found: number;
   test_cases_generated: number;
-  error_message?: string;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export function useGenerationJob(jobId: string) {
@@ -42,7 +46,7 @@ export function useGenerationJob(jobId: string) {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'generation_jobs',
+          table: 'ai_generation_jobs',
           filter: `id=eq.${jobId}`,
         },
         (payload) => {
@@ -64,7 +68,7 @@ export function useLatestGenerationJob(projectId: string) {
     queryKey: ['generation-jobs', 'latest', projectId],
     queryFn: async () => {
       const jobs = await api.get<GenerationJob[]>(
-        `/projects/${projectId}/generation-jobs?limit=1`,
+        `/ai/generation-jobs/project/${projectId}`,
       );
       return jobs?.[0] ?? null;
     },

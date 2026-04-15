@@ -232,7 +232,7 @@ function JobProgressTracker({
         title={t('generation.generating')}
         description={t('generation.generatingDesc')}
         animationClass=""
-        progress={job.progress}
+        progress={job.status === 'generating' ? 75 : job.status === 'completed' ? 100 : 50}
       />
 
       {job.status === 'completed' && (
