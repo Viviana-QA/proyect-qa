@@ -38,7 +38,7 @@ export function StatCard({
             {change && (
               <span
                 className={`inline-flex items-center gap-0.5 text-xs font-medium ${
-                  change.type === 'up' ? 'text-[#0ab39c]' : 'text-[#f06548]'
+                  change.type === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'
                 }`}
               >
                 {change.type === 'up' ? (

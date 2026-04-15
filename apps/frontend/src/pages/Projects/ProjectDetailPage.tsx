@@ -43,13 +43,13 @@ export function ProjectDetailPage() {
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-[#495057]">{project.name}</h1>
+              <h1 className="text-xl font-semibold text-[#1e1b4b]">{project.name}</h1>
               <div className="mt-2 flex items-center gap-3">
                 <a
                   href={project.base_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-[#405189]"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-[#7c3aed]"
                 >
                   <ExternalLink className="h-3 w-3" />
                   {project.base_url}
@@ -67,7 +67,7 @@ export function ProjectDetailPage() {
             <Link to={`/projects/${id}/generate`}>
               <Button
                 size="sm"
-                className="h-8 gap-1.5 bg-[rgba(64,81,137,0.1)] text-[#405189] hover:bg-[rgba(64,81,137,0.2)] border-0 shadow-none"
+                className="h-8 gap-1.5 bg-[rgba(124,58,237,0.1)] text-[#7c3aed] hover:bg-[rgba(124,58,237,0.2)] border-0 shadow-none"
               >
                 <Brain className="h-3.5 w-3.5" />
                 {t('projects.generateTestsWithAI')}
@@ -76,7 +76,7 @@ export function ProjectDetailPage() {
             <Link to={`/projects/${id}/test-cases`}>
               <Button
                 size="sm"
-                className="h-8 gap-1.5 bg-[rgba(41,156,219,0.1)] text-[#299cdb] hover:bg-[rgba(41,156,219,0.2)] border-0 shadow-none"
+                className="h-8 gap-1.5 bg-[rgba(139,92,246,0.1)] text-[#8b5cf6] hover:bg-[rgba(139,92,246,0.2)] border-0 shadow-none"
               >
                 <TestTube2 className="h-3.5 w-3.5" />
                 {t('projects.testCases')}
@@ -85,7 +85,7 @@ export function ProjectDetailPage() {
             <Link to={`/projects/${id}/run`}>
               <Button
                 size="sm"
-                className="h-8 gap-1.5 bg-[rgba(10,179,156,0.1)] text-[#0ab39c] hover:bg-[rgba(10,179,156,0.2)] border-0 shadow-none"
+                className="h-8 gap-1.5 bg-[rgba(16,185,129,0.1)] text-[#10b981] hover:bg-[rgba(16,185,129,0.2)] border-0 shadow-none"
               >
                 <Play className="h-3.5 w-3.5" />
                 {t('projects.runTests')}
@@ -94,7 +94,7 @@ export function ProjectDetailPage() {
             <Link to={`/projects/${id}/reports`}>
               <Button
                 size="sm"
-                className="h-8 gap-1.5 bg-[rgba(247,184,75,0.1)] text-[#f7b84b] hover:bg-[rgba(247,184,75,0.2)] border-0 shadow-none"
+                className="h-8 gap-1.5 bg-[rgba(245,158,11,0.1)] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.2)] border-0 shadow-none"
               >
                 <FileBarChart className="h-3.5 w-3.5" />
                 {t('projects.reports')}
@@ -119,32 +119,32 @@ export function ProjectDetailPage() {
           title={t('projects.totalSuites')}
           value={suites?.length ?? 0}
           icon={Layers}
-          iconBg="rgba(64,81,137,0.15)"
-          iconColor="#405189"
+          iconBg="rgba(124,58,237,0.15)"
+          iconColor="#7c3aed"
           subtitle={t('projects.testSuitesSubtitle')}
         />
         <StatCard
           title={t('projects.totalRuns')}
           value={totalRuns}
           icon={Activity}
-          iconBg="rgba(41,156,219,0.15)"
-          iconColor="#299cdb"
+          iconBg="rgba(139,92,246,0.15)"
+          iconColor="#8b5cf6"
           subtitle={t('projects.allTime')}
         />
         <StatCard
           title={t('projects.passRate')}
           value={totalRuns > 0 ? `${passRate}%` : '--'}
           icon={BarChart3}
-          iconBg="rgba(10,179,156,0.15)"
-          iconColor="#0ab39c"
+          iconBg="rgba(16,185,129,0.15)"
+          iconColor="#10b981"
           subtitle={t('projects.completedRuns')}
         />
         <StatCard
           title={t('projects.lastRun')}
           value={lastRun ? formatTimeAgo(lastRun.created_at, t) : '--'}
           icon={Clock}
-          iconBg="rgba(247,184,75,0.15)"
-          iconColor="#f7b84b"
+          iconBg="rgba(245,158,11,0.15)"
+          iconColor="#f59e0b"
           subtitle={lastRun ? lastRun.status : t('projects.noRunsYet')}
         />
       </div>
@@ -152,10 +152,10 @@ export function ProjectDetailPage() {
       {/* Test Suites */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-base font-semibold text-[#495057]">
+          <CardTitle className="text-base font-semibold text-[#1e1b4b]">
             {t('projects.testSuites', { count: suites?.length ?? 0 })}
           </CardTitle>
-          <Link to={`/projects/${id}/test-cases`} className="text-xs font-medium text-[#405189] hover:underline">
+          <Link to={`/projects/${id}/test-cases`} className="text-xs font-medium text-[#7c3aed] hover:underline">
             {t('projects.viewAll')}
           </Link>
         </CardHeader>
@@ -180,8 +180,8 @@ export function ProjectDetailPage() {
                 </thead>
                 <tbody className="divide-y">
                   {suites.map((suite) => (
-                    <tr key={suite.id} className="transition-colors hover:bg-[#f3f3f9]/60">
-                      <td className="py-3 pr-4 font-medium text-[#495057]">{suite.name}</td>
+                    <tr key={suite.id} className="transition-colors hover:bg-[#f5f3ff]/60">
+                      <td className="py-3 pr-4 font-medium text-[#1e1b4b]">{suite.name}</td>
                       <td className="py-3 pr-4">
                         <Badge variant="outline" className="text-xs capitalize">
                           {suite.test_type}
@@ -209,7 +209,7 @@ export function ProjectDetailPage() {
       {/* Recent Test Runs */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-base font-semibold text-[#495057]">{t('projects.recentTestRuns')}</CardTitle>
+          <CardTitle className="text-base font-semibold text-[#1e1b4b]">{t('projects.recentTestRuns')}</CardTitle>
         </CardHeader>
         <CardContent>
           {!recentRuns.length ? (
@@ -231,17 +231,17 @@ export function ProjectDetailPage() {
                 </thead>
                 <tbody className="divide-y">
                   {recentRuns.map((run) => (
-                    <tr key={run.id} className="transition-colors hover:bg-[#f3f3f9]/60">
+                    <tr key={run.id} className="transition-colors hover:bg-[#f5f3ff]/60">
                       <td className="py-3 pr-4">
                         <Link to={`/test-runs/${run.id}`}>
                           <StatusBadge status={run.status} />
                         </Link>
                       </td>
-                      <td className="py-3 pr-4 capitalize text-[#495057]">{run.browser}</td>
+                      <td className="py-3 pr-4 capitalize text-[#1e1b4b]">{run.browser}</td>
                       <td className="py-3 pr-4">
-                        <span className="text-[#0ab39c] font-medium">{run.passed}</span>
+                        <span className="text-[#10b981] font-medium">{run.passed}</span>
                         {' / '}
-                        <span className="text-[#f06548] font-medium">{run.failed}</span>
+                        <span className="text-[#ef4444] font-medium">{run.failed}</span>
                         {' / '}
                         <span className="text-muted-foreground">{run.skipped}</span>
                       </td>

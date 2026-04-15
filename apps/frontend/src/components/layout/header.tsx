@@ -54,7 +54,7 @@ export function Header() {
   const user = useAuthStore((s) => s.user);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm">
+    <header className="flex h-16 items-center justify-between border-b border-purple-100 bg-white px-6 shadow-sm">
       <Breadcrumb />
 
       <div className="flex items-center gap-3">
@@ -66,7 +66,7 @@ export function Header() {
           <Bell className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#405189]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#7c3aed]">
             <User className="h-4 w-4 text-white" />
           </div>
           {user?.email && (

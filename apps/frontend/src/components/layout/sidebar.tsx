@@ -56,9 +56,9 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
 
   return (
-    <div className="flex h-full w-64 flex-col bg-[#405189]">
+    <div className="flex h-full w-64 flex-col bg-gradient-to-b from-[#1e1b4b] to-[#312e81]">
       <div className="flex h-16 items-center gap-2 px-6">
-        <TestTube2 className="h-6 w-6 text-white" />
+        <TestTube2 className="h-6 w-6 text-[#a78bfa]" />
         <span className="text-lg font-bold text-white">{t('nav.appName')}</span>
       </div>
 
@@ -77,8 +77,8 @@ export function Sidebar() {
                     cn(
                       'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-white/10 text-white'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white',
+                        ? 'bg-white/10 text-white border-l-2 border-[#a78bfa]'
+                        : 'text-white/70 hover:bg-[#312e81] hover:text-white',
                     )
                   }
                 >
