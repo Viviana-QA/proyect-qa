@@ -19,6 +19,15 @@ export interface PageAnalysis {
   aria_landmarks: { role: string; label: string | null }[];
   api_endpoints: { method: string; url: string }[];
   page_routes: string[];
+  accessibility_tree?: any;
+  meta_tags?: { name: string; content: string }[];
+  detected_frameworks?: string[];
+  performance_data?: {
+    domContentLoaded: number;
+    load: number;
+    firstPaint: number;
+  };
+  console_errors?: string[];
 }
 
 export interface InteractiveElement {

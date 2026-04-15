@@ -1,6 +1,15 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AgentConfig } from '../config/agent-config';
-import type { TestRun, TestCase, SubmitTestResultDto } from '@qa/shared-types';
+import type {
+  TestRun,
+  TestCase,
+  TestSuite,
+  SubmitTestResultDto,
+  CreateTestCaseDto,
+  CreateTestSuiteDto,
+  UpdateTestCaseDto,
+  Project,
+} from '@qa/shared-types';
 
 export class ApiClient {
   private supabase: SupabaseClient;
@@ -77,6 +86,41 @@ export class ApiClient {
     await this.request(`/test-runs/${runId}/complete`, {
       method: 'POST',
       body: JSON.stringify({ duration_ms: durationMs }),
+    });
+  }
+
+  async getProject(projectId: string): Promise<Project> {
+    return this.request(`/projects/${projectId}`);
+  }
+
+  async createTestSuite(
+    projectId: string,
+    dto: CreateTestSuiteDto,
+  ): Promise<TestSuite> {
+    return this.request(`/projects/${projectId}/suites`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async createTestCase(
+    projectId: string,
+    dto: CreateTestCaseDto,
+  ): Promise<TestCase> {
+    return this.request(`/projects/${projectId}/test-cases`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  }
+
+  async updateTestCase(
+    projectId: string,
+    testCaseId: string,
+    dto: UpdateTestCaseDto,
+  ): Promise<TestCase> {
+    return this.request(`/projects/${projectId}/test-cases/${testCaseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
     });
   }
 

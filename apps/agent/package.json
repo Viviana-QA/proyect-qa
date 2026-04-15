@@ -21,6 +21,7 @@
     "open": "^10.1.0",
     "pixelmatch": "^6.0.0",
     "pngjs": "^7.0.0",
+    "@google/generative-ai": "^0.21.0",
     "@qa/shared-types": "workspace:*"
   },
   "devDependencies": {

@@ -80,7 +80,10 @@
       "Bash(python3 -m pip install reportlab --user)",
       "Bash(python3 -c \"import reportlab; print\\('reportlab version:', reportlab.Version\\)\")",
       "Bash(python3 /dev/stdin)",
-      "Bash(grep -l \"useTranslation\" /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/pages/**/*.tsx /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/components/layout/*.tsx)"
+      "Bash(grep -l \"useTranslation\" /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/pages/**/*.tsx /Users/imaginamos/Documents/proyect-qa/apps/frontend/src/components/layout/*.tsx)",
+      "Bash(sed -i '' \"s/\\\\?.__proto__?.hasOwnProperty?.\\('_reactRootContainer'\\)//\" apps/agent/src/runner/page-crawler.ts)",
+      "Bash(sed -i '' \"s/\\\\?.__proto__?.hasOwnProperty?.\\('__vue__'\\)//\" apps/agent/src/runner/page-crawler.ts)",
+      "Bash(sed -i '' 's/accessibilityTree = await page.accessibility.snapshot\\(\\);/accessibilityTree = await \\(page as any\\).accessibility?.snapshot?.\\(\\) ?? null;/' apps/agent/src/runner/page-crawler.ts)"
     ]
   }
 }

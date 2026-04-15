@@ -1,7 +1,7 @@
 import { loadConfig } from '../config/agent-config';
 import { ApiClient } from '../connection/api-client';
 import { PlaywrightRunner } from '../runner/playwright-runner';
-import { PollingService } from '../connection/polling-service';
+import { RealtimeService } from '../connection/polling-service';
 
 export async function startCommand(options: {
   config?: string;
@@ -35,16 +35,16 @@ export async function startCommand(options: {
   console.log('Session restored successfully');
 
   const runner = new PlaywrightRunner(config);
-  const poller = new PollingService(apiClient, runner);
+  const realtime = new RealtimeService(apiClient, runner);
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {
     console.log('\nReceived SIGINT, shutting down...');
-    poller.stop();
+    realtime.stop();
   });
   process.on('SIGTERM', () => {
-    poller.stop();
+    realtime.stop();
   });
 
-  await poller.start();
+  await realtime.start();
 }

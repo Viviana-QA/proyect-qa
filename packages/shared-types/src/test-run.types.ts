@@ -76,4 +76,6 @@ export interface SubmitTestResultDto {
   accessibility_violations?: AccessibilityViolation[];
   performance_metrics?: PerformanceMetrics;
   retry_count?: number;
+  healed?: boolean;
+  original_error?: string;
 }

@@ -6,6 +6,7 @@ export interface AgentConfig {
   apiUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
+  geminiApiKey: string;
   agentId: string;
   concurrency: number;
   browsers: string[];
@@ -19,6 +20,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   apiUrl: 'http://localhost:3000/api',
   supabaseUrl: '',
   supabaseAnonKey: '',
+  geminiApiKey: '',
   agentId: `agent-${os.hostname()}`,
   concurrency: 1,
   browsers: ['chromium'],
@@ -51,6 +53,7 @@ export function loadConfig(configPath: string = '.qa-agent.json'): AgentConfig {
     apiUrl: process.env.QA_API_URL || DEFAULT_CONFIG.apiUrl,
     supabaseUrl: process.env.QA_SUPABASE_URL || DEFAULT_CONFIG.supabaseUrl,
     supabaseAnonKey: process.env.QA_SUPABASE_ANON_KEY || DEFAULT_CONFIG.supabaseAnonKey,
+    geminiApiKey: process.env.QA_GEMINI_API_KEY || DEFAULT_CONFIG.geminiApiKey,
   };
 }
 

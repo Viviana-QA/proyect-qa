@@ -1,44 +1,138 @@
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { ApiClient } from './api-client';
 import { PlaywrightRunner } from '../runner/playwright-runner';
 import type { TestRun } from '@qa/shared-types';
 
-export class PollingService {
+/**
+ * RealtimeService replaces the old 5-second HTTP polling loop.
+ *
+ * Primary mechanism: Supabase Realtime WebSocket subscription on the
+ * `test_runs` table filtered to `status=eq.pending`.  The agent is
+ * notified instantly when a new pending run appears -- zero Vercel
+ * invocations consumed.
+ *
+ * Fallback: a single HTTP poll every 60 seconds catches anything that
+ * the Realtime channel might have missed (e.g. during a brief
+ * reconnect window).
+ */
+export class RealtimeService {
   private running = false;
-  private pollIntervalMs = 5000;
+  private channel: RealtimeChannel | null = null;
+  private fallbackTimer: ReturnType<typeof setInterval> | null = null;
+  private processing = new Set<string>();
+
+  private static readonly FALLBACK_INTERVAL_MS = 60_000;
 
   constructor(
     private apiClient: ApiClient,
     private runner: PlaywrightRunner,
   ) {}
 
+  // ----- public API -----
+
   async start(): Promise<void> {
     this.running = true;
-    console.log(`Polling for test runs every ${this.pollIntervalMs / 1000}s...`);
 
-    while (this.running) {
-      try {
-        const pendingRuns = await this.apiClient.getPendingRuns();
+    this.subscribeRealtime();
+    this.startFallbackPolling();
 
-        if (pendingRuns.length > 0) {
-          console.log(`Found ${pendingRuns.length} pending run(s)`);
-          for (const run of pendingRuns) {
-            if (!this.running) break;
-            await this.processRun(run);
-          }
-        }
-      } catch (error: any) {
-        console.error(`Polling error: ${error.message}`);
-      }
+    console.log('Agent listening via Supabase Realtime (fallback poll every 60 s)');
 
-      if (this.running) {
-        await sleep(this.pollIntervalMs);
-      }
-    }
+    // Keep the process alive until stop() is called.
+    await this.waitUntilStopped();
   }
 
   stop(): void {
     this.running = false;
     console.log('Agent stopping...');
+
+    if (this.channel) {
+      this.apiClient.getSupabase().removeChannel(this.channel);
+      this.channel = null;
+    }
+
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer);
+      this.fallbackTimer = null;
+    }
+  }
+
+  // ----- Realtime subscription -----
+
+  private subscribeRealtime(): void {
+    const supabase = this.apiClient.getSupabase();
+
+    this.channel = supabase
+      .channel('test-runs-pending')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'test_runs',
+          filter: 'status=eq.pending',
+        },
+        (payload) => {
+          const run = payload.new as TestRun;
+          console.log(`[realtime] New pending run detected: ${run.id}`);
+          this.enqueueRun(run);
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'test_runs',
+          filter: 'status=eq.pending',
+        },
+        (payload) => {
+          const run = payload.new as TestRun;
+          console.log(`[realtime] Run updated to pending: ${run.id}`);
+          this.enqueueRun(run);
+        },
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[realtime] Subscribed to test_runs changes');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`[realtime] Channel error: ${err?.message ?? 'unknown'}`);
+        } else if (status === 'TIMED_OUT') {
+          console.warn('[realtime] Subscription timed out, will rely on fallback polling');
+        }
+      });
+  }
+
+  // ----- Fallback polling (60 s) -----
+
+  private startFallbackPolling(): void {
+    this.fallbackTimer = setInterval(async () => {
+      if (!this.running) return;
+
+      try {
+        const pendingRuns = await this.apiClient.getPendingRuns();
+        if (pendingRuns.length > 0) {
+          console.log(`[fallback] Found ${pendingRuns.length} pending run(s)`);
+          for (const run of pendingRuns) {
+            this.enqueueRun(run);
+          }
+        }
+      } catch (error: any) {
+        console.error(`[fallback] Poll error: ${error.message}`);
+      }
+    }, RealtimeService.FALLBACK_INTERVAL_MS);
+  }
+
+  // ----- Run processing -----
+
+  private enqueueRun(run: TestRun): void {
+    if (!this.running) return;
+    if (this.processing.has(run.id)) return; // already being handled
+
+    this.processing.add(run.id);
+    this.processRun(run).finally(() => {
+      this.processing.delete(run.id);
+    });
   }
 
   private async processRun(run: TestRun): Promise<void> {
@@ -65,8 +159,17 @@ export class PollingService {
       console.error(`Run ${run.id} failed: ${error.message}`);
     }
   }
-}
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  // ----- Helpers -----
+
+  private waitUntilStopped(): Promise<void> {
+    return new Promise((resolve) => {
+      const check = setInterval(() => {
+        if (!this.running) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 500);
+    });
+  }
 }

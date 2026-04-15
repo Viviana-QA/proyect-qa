@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { loginCommand } from './commands/login';
 import { startCommand } from './commands/start';
 import { crawlCommand } from './commands/crawl';
+import { generateCommand } from './commands/generate';
 
 const program = new Command();
 
@@ -30,5 +31,11 @@ program
   .argument('<url>', 'URL to crawl')
   .option('-o, --output <path>', 'Output file path')
   .action(crawlCommand);
+
+program
+  .command('generate')
+  .argument('<project-id>', 'Project ID to generate tests for')
+  .description('Generate AI test cases for a project (runs Gemini locally, no timeout)')
+  .action(generateCommand);
 
 program.parse();
