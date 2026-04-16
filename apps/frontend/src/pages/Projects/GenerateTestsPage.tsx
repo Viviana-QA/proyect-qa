@@ -50,7 +50,7 @@ interface GeneratedModule {
 }
 
 export function GenerateTestsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: project, isLoading } = useProject(id!);
@@ -108,6 +108,7 @@ export function GenerateTestsPage() {
           base_url: project.base_url,
           test_types: selectedTypes,
           project_name: project.name,
+          language: i18n.language,
           business_context: project.industry ? {
             industry: project.industry,
             target_audience: project.target_audience,
@@ -159,7 +160,7 @@ export function GenerateTestsPage() {
         setError(err.message);
       }
     }
-  }, [project, selectedTypes]);
+  }, [project, selectedTypes, i18n.language]);
 
   const handleSSEEvent = (event: string, data: any) => {
     switch (event) {

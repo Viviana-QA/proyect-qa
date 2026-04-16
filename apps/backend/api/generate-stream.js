@@ -34,6 +34,7 @@ module.exports = async function handler(req, res) {
     const test_types = body.test_types || ['e2e'];
     const project_name = body.project_name || '';
     const biz = body.business_context;
+    const language = body.language || 'en';
 
     // Extract web via Jina AI
     let page = '';
@@ -53,12 +54,15 @@ module.exports = async function handler(req, res) {
 
     // Build prompt
     const ctx = biz ? '\nBusiness: ' + JSON.stringify(biz) : '';
+    const langName = language === 'es' ? 'Spanish' : 'English';
     const prompt = `You are an expert QA engineer. Analyze this web page and generate Playwright test cases.
 
 Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
 
 PAGE CONTENT (Markdown):
 ${content}
+
+IMPORTANT: Write all test titles, descriptions, and module names in ${langName}. The code comments should also be in ${langName}. The code itself (Playwright API calls) stays in English.
 
 INSTRUCTIONS:
 1. Divide into logical modules

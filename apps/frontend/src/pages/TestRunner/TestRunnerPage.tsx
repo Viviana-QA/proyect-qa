@@ -1,93 +1,528 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { useTestRuns, useCreateTestRun } from '@/hooks/use-test-runs';
-import { useTestSuites } from '@/hooks/use-test-cases';
+import { useTestRuns } from '@/hooks/use-test-runs';
+import { useTestSuites, useTestCases } from '@/hooks/use-test-cases';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { TestCase, TestSuite } from '@qa/shared-types';
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  Copy,
+  Check,
+  Terminal,
+  FileCode,
+  ListChecks,
+  Tag,
+} from 'lucide-react';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface GroupedTests {
+  suite: TestSuite;
+  cases: TestCase[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const PRIORITY_VARIANT: Record<string, 'destructive' | 'warning' | 'info' | 'secondary'> = {
+  critical: 'destructive',
+  high: 'warning',
+  medium: 'info',
+  low: 'secondary',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  e2e: 'E2E',
+  regression: 'Regression',
+  visual: 'Visual',
+  accessibility: 'A11y',
+  performance: 'Perf',
+  api: 'API',
+  cross_browser: 'Cross-Browser',
+  responsive: 'Responsive',
+};
+
+function codeSummary(code: string, maxLines = 8): string {
+  return code.split('\n').slice(0, maxLines).join('\n');
+}
+
+function generatePlaywrightFile(tests: TestCase[]): string {
+  return tests.map((tc) => tc.playwright_code).join('\n\n');
+}
+
+function downloadBlob(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function TestRunnerPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
-  const { data: suites } = useTestSuites(projectId!);
-  const { data: runs, isLoading } = useTestRuns(projectId!);
-  const createRun = useCreateTestRun(projectId!);
-  const [selectedSuite, setSelectedSuite] = useState('');
-  const [browser, setBrowser] = useState('chromium');
 
-  const handleRunTests = async () => {
-    await createRun.mutateAsync({
-      suite_id: selectedSuite || undefined,
-      browser,
+  /* Data fetching */
+  const { data: suites } = useTestSuites(projectId!);
+  const { data: allCases } = useTestCases(projectId!, { status: 'active' });
+  const { data: runs, isLoading: runsLoading } = useTestRuns(projectId!);
+
+  /* Local state */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  const [collapsedSuites, setCollapsedSuites] = useState<Set<string>>(new Set());
+  const [browser, setBrowser] = useState('chromium');
+  const [headless, setHeadless] = useState(true);
+  const [copiedCli, setCopiedCli] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState(false);
+
+  /* Group test cases by suite */
+  const grouped = useMemo<GroupedTests[]>(() => {
+    if (!suites || !allCases) return [];
+    return suites
+      .map((suite) => ({
+        suite,
+        cases: allCases.filter((tc) => tc.suite_id === suite.id),
+      }))
+      .filter((g) => g.cases.length > 0);
+  }, [suites, allCases]);
+
+  /* Derived counts */
+  const totalTests = allCases?.length ?? 0;
+  const selectedCount = selectedIds.size;
+
+  /* Ordered selection for export (maintain insertion order) */
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
+  const selectedTests = useMemo(() => {
+    if (!allCases) return [];
+    const ordered = selectionOrder.filter((id) => selectedIds.has(id));
+    return ordered.map((id) => allCases.find((tc) => tc.id === id)!).filter(Boolean);
+  }, [allCases, selectedIds, selectionOrder]);
+
+  /* ---- Selection helpers ---- */
+
+  const toggleTest = useCallback(
+    (id: string) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+      setSelectionOrder((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        return [...prev, id];
+      });
+    },
+    [],
+  );
+
+  const toggleSuiteAll = useCallback(
+    (suiteId: string, cases: TestCase[]) => {
+      const ids = cases.map((c) => c.id);
+      const allSelected = ids.every((id) => selectedIds.has(id));
+
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => {
+          if (allSelected) {
+            next.delete(id);
+          } else {
+            next.add(id);
+          }
+        });
+        return next;
+      });
+      setSelectionOrder((prev) => {
+        if (allSelected) return prev.filter((id) => !ids.includes(id));
+        const newIds = ids.filter((id) => !prev.includes(id));
+        return [...prev, ...newIds];
+      });
+    },
+    [selectedIds],
+  );
+
+  /* ---- Expand / collapse helpers ---- */
+
+  const toggleTestExpand = useCallback((id: string) => {
+    setExpandedTests((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+  }, []);
+
+  const toggleSuiteCollapse = useCallback((id: string) => {
+    setCollapsedSuites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  /* ---- Reorder helpers ---- */
+
+  const moveTest = useCallback(
+    (id: string, direction: 'up' | 'down') => {
+      setSelectionOrder((prev) => {
+        const idx = prev.indexOf(id);
+        if (idx === -1) return prev;
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= prev.length) return prev;
+        const next = [...prev];
+        [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+        return next;
+      });
+    },
+    [],
+  );
+
+  /* ---- Export & CLI ---- */
+
+  const cliCommand = `npx playwright test generated-tests.spec.ts --project=${browser}${headless ? '' : ' --headed'}`;
+
+  const handleExport = () => {
+    if (selectedTests.length === 0) return;
+    const content = generatePlaywrightFile(selectedTests);
+    downloadBlob(content, 'generated-tests.spec.ts');
   };
+
+  const handleCopyCli = async () => {
+    await navigator.clipboard.writeText(cliCommand);
+    setCopiedCli(true);
+    setTimeout(() => setCopiedCli(false), 2000);
+  };
+
+  const handleCopyCommand = async () => {
+    await navigator.clipboard.writeText(cliCommand);
+    setCopiedCommand(true);
+    setTimeout(() => setCopiedCommand(false), 2000);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  Render                                                             */
+  /* ------------------------------------------------------------------ */
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{t('testRunner.title')}</h1>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-[#1e1b4b]">{t('testRunner.title')}</h1>
+        <p className="mt-1 text-muted-foreground">
+          {t('testRunner.subtitle', 'Select and organize test cases for your test plan')}
+        </p>
+      </div>
 
-      {/* Run Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{t('testRunner.startNewTestRun')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('testRunner.testSuite')}</label>
-              <select
-                value={selectedSuite}
-                onChange={(e) => setSelectedSuite(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      {/* ------------------------------------------------------------ */}
+      {/*  Test Selection by Module / Suite                              */}
+      {/* ------------------------------------------------------------ */}
+      <div className="space-y-3">
+        {grouped.length === 0 && (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <ListChecks className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+              <p>{t('testRunner.noTestCases', 'No active test cases found. Generate tests first.')}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {grouped.map(({ suite, cases }) => {
+          const isCollapsed = collapsedSuites.has(suite.id);
+          const allSelected = cases.every((c) => selectedIds.has(c.id));
+          const someSelected = cases.some((c) => selectedIds.has(c.id));
+          const selectedInSuite = cases.filter((c) => selectedIds.has(c.id)).length;
+
+          return (
+            <Card key={suite.id} className="overflow-hidden border-[#7c3aed]/20">
+              {/* Suite header */}
+              <button
+                type="button"
+                onClick={() => toggleSuiteCollapse(suite.id)}
+                className="flex w-full items-center justify-between bg-[#f5f3ff] px-4 py-3 text-left hover:bg-[#ede9fe] transition-colors"
               >
-                <option value="">{t('testRunner.allActiveTests')}</option>
-                {suites?.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
+                <div className="flex items-center gap-3">
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4 text-[#7c3aed]" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-[#7c3aed]" />
+                  )}
+                  <span className="font-semibold text-[#1e1b4b]">{suite.name}</span>
+                  <Badge variant="info">{TYPE_LABELS[suite.test_type] ?? suite.test_type}</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    ({selectedInSuite}/{cases.length} {t('testRunner.testsSelected', 'selected')})
+                  </span>
+                </div>
+                <div
+                  className="flex items-center gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={allSelected}
+                    data-indeterminate={someSelected && !allSelected ? true : undefined}
+                    onCheckedChange={() => toggleSuiteAll(suite.id, cases)}
+                    className="border-[#7c3aed] data-[state=checked]:bg-[#7c3aed]"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {t('testRunner.selectAll', 'Select all')}
+                  </span>
+                </div>
+              </button>
+
+              {/* Test case list */}
+              {!isCollapsed && (
+                <div className="divide-y">
+                  {cases.map((tc) => {
+                    const isSelected = selectedIds.has(tc.id);
+                    const isExpanded = expandedTests.has(tc.id);
+                    const orderIdx = selectionOrder.indexOf(tc.id);
+
+                    return (
+                      <div key={tc.id} className="group">
+                        {/* Test row */}
+                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-[#f5f3ff]/50 transition-colors">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleTest(tc.id)}
+                              className="border-[#7c3aed] data-[state=checked]:bg-[#7c3aed]"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleTestExpand(tc.id)}
+                            className="flex flex-1 items-center gap-2 text-left"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                            <span className="font-medium text-sm">{tc.title}</span>
+                          </button>
+
+                          {/* Badges */}
+                          <Badge variant={PRIORITY_VARIANT[tc.priority] ?? 'secondary'} className="text-[10px]">
+                            {tc.priority}
+                          </Badge>
+
+                          {/* Reorder buttons (visible when selected) */}
+                          {isSelected && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => moveTest(tc.id, 'up')}
+                                disabled={orderIdx <= 0}
+                                className="rounded p-1 text-muted-foreground hover:text-[#7c3aed] hover:bg-[#f5f3ff] disabled:opacity-30"
+                                title={t('testRunner.moveUp', 'Move up')}
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveTest(tc.id, 'down')}
+                                disabled={orderIdx >= selectionOrder.length - 1}
+                                className="rounded p-1 text-muted-foreground hover:text-[#7c3aed] hover:bg-[#f5f3ff] disabled:opacity-30"
+                                title={t('testRunner.moveDown', 'Move down')}
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Expanded detail */}
+                        {isExpanded && (
+                          <div className="border-t bg-[#f5f3ff]/30 px-12 py-4 space-y-3">
+                            {tc.description && (
+                              <p className="text-sm text-muted-foreground">{tc.description}</p>
+                            )}
+
+                            {tc.tags.length > 0 && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                                {tc.tags.map((tag) => (
+                                  <Badge key={tag} variant="outline" className="text-[10px]">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="rounded-md bg-[#1e1b4b] p-4 overflow-auto">
+                              <pre className="text-xs text-green-300 font-mono whitespace-pre">
+                                {codeSummary(tc.playwright_code)}
+                              </pre>
+                              {tc.playwright_code.split('\n').length > 8 && (
+                                <p className="mt-2 text-xs text-purple-300">
+                                  {t('testRunner.viewFullCode', '... view full code in test details')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Selection summary */}
+      {totalTests > 0 && (
+        <p className="text-sm font-medium text-[#7c3aed]">
+          {t('testRunner.selectedCount', 'Selected: {{selected}} of {{total}} tests', {
+            selected: selectedCount,
+            total: totalTests,
+          })}
+        </p>
+      )}
+
+      {/* ------------------------------------------------------------ */}
+      {/*  Run Options & Export                                          */}
+      {/* ------------------------------------------------------------ */}
+      <Card className="border-[#7c3aed]/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[#1e1b4b]">
+            <FileCode className="h-5 w-5 text-[#7c3aed]" />
+            {t('testRunner.runOptions', 'Run Options')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Browser selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('testRunner.browser')}</label>
               <select
                 value={browser}
                 onChange={(e) => setBrowser(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
               >
                 <option value="chromium">{t('testRunner.browserChromium')}</option>
                 <option value="firefox">{t('testRunner.browserFirefox')}</option>
                 <option value="webkit">{t('testRunner.browserWebkit')}</option>
               </select>
             </div>
-            <div className="flex items-end">
-              <Button
-                onClick={handleRunTests}
-                disabled={createRun.isPending}
-                className="w-full"
+
+            {/* Headless toggle */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t('testRunner.headless', 'Headless')}
+              </label>
+              <select
+                value={headless ? 'yes' : 'no'}
+                onChange={(e) => setHeadless(e.target.value === 'yes')}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
               >
-                {createRun.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="mr-2 h-4 w-4" />
-                )}
-                {t('testRunner.runTests')}
-              </Button>
+                <option value="yes">{t('testRunner.headlessYes', 'Yes')}</option>
+                <option value="no">{t('testRunner.headlessNo', 'No')}</option>
+              </select>
             </div>
           </div>
-          <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-            {t('testRunner.agentWarning')} <code className="rounded bg-background px-1">{t('testRunner.agentCommand')}</code>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={handleExport}
+              disabled={selectedCount === 0}
+              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {t('testRunner.exportConfig', 'Export Playwright Config')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCopyCli}
+              disabled={selectedCount === 0}
+              className="border-[#7c3aed]/30 text-[#7c3aed] hover:bg-[#f5f3ff]"
+            >
+              {copiedCli ? (
+                <Check className="mr-2 h-4 w-4" />
+              ) : (
+                <Copy className="mr-2 h-4 w-4" />
+              )}
+              {copiedCli
+                ? t('testRunner.copied', 'Copied!')
+                : t('testRunner.copyCli', 'Copy CLI Command')}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Run History */}
+      {/* ------------------------------------------------------------ */}
+      {/*  How to Run                                                    */}
+      {/* ------------------------------------------------------------ */}
+      <Card className="border-[#7c3aed]/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[#1e1b4b]">
+            <Terminal className="h-5 w-5 text-[#7c3aed]" />
+            {t('testRunner.howToRun', 'How to run')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md bg-[#1e1b4b] p-4 flex items-center justify-between gap-4">
+            <code className="text-sm text-green-300 font-mono">$ {cliCommand}</code>
+            <button
+              type="button"
+              onClick={handleCopyCommand}
+              className="shrink-0 rounded p-2 text-purple-300 hover:bg-white/10 transition-colors"
+              title={t('testRunner.copyCommand', 'Copy command')}
+            >
+              {copiedCommand ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t(
+              'testRunner.howToRunHint',
+              'Export the test file above, then run this command in your project directory.',
+            )}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* ------------------------------------------------------------ */}
+      {/*  Run History                                                   */}
+      {/* ------------------------------------------------------------ */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{t('testRunner.testRunHistory')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {runsLoading ? (
             <p className="text-muted-foreground">{t('testRunner.loading')}</p>
           ) : !runs?.length ? (
             <p className="text-sm text-muted-foreground">{t('testRunner.noTestRunsYet')}</p>
@@ -112,10 +547,18 @@ export function TestRunnerPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-green-600">{t('testRunner.passed', { count: run.passed })}</span>
-                    <span className="text-red-600">{t('testRunner.failed', { count: run.failed })}</span>
-                    <span className="text-muted-foreground">{t('testRunner.skipped', { count: run.skipped })}</span>
-                    <span className="font-medium">{t('testRunner.total', { count: run.total_tests })}</span>
+                    <span className="text-green-600">
+                      {t('testRunner.passed', { count: run.passed })}
+                    </span>
+                    <span className="text-red-600">
+                      {t('testRunner.failed', { count: run.failed })}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {t('testRunner.skipped', { count: run.skipped })}
+                    </span>
+                    <span className="font-medium">
+                      {t('testRunner.total', { count: run.total_tests })}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -126,6 +569,10 @@ export function TestRunnerPage() {
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Small helper component (kept from original)                        */
+/* ------------------------------------------------------------------ */
 
 function RunStatusIcon({ status }: { status: string }) {
   switch (status) {
