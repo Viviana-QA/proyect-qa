@@ -77,3 +77,14 @@ export function useDeleteTestCase() {
       queryClient.invalidateQueries({ queryKey: ['test-cases'] }),
   });
 }
+
+export function useDeleteTestSuite(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (suiteId: string) => api.delete(`/test-suites/${suiteId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-suites', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] });
+    },
+  });
+}

@@ -113,8 +113,8 @@ export function TestCasesPage() {
   }, [grouped, search]);
 
   const suiteName = (suiteId: string) => {
-    if (suiteId === '__unassigned__') return 'Unassigned Tests';
-    return testSuites?.find((s) => s.id === suiteId)?.name || 'Unknown Suite';
+    if (suiteId === '__unassigned__') return t('testCasesPage.unassigned');
+    return testSuites?.find((s) => s.id === suiteId)?.name || t('testCasesPage.unknownSuite');
   };
 
   const toggleSuite = (id: string) => {
@@ -201,7 +201,7 @@ export function TestCasesPage() {
           <h1 className="text-2xl font-bold text-[#1e1b4b]">{t('testCases.title')}</h1>
           {totalCases > 0 && (
             <p className="text-sm text-muted-foreground mt-1">
-              {totalCases} test case{totalCases !== 1 ? 's' : ''} across {filteredGrouped.size} module{filteredGrouped.size !== 1 ? 's' : ''}
+              {t('testCasesPage.countSummary', { count: totalCases, modules: filteredGrouped.size })}
             </p>
           )}
         </div>
@@ -258,7 +258,7 @@ export function TestCasesPage() {
                     <div>
                       <h3 className="font-semibold text-[#1e1b4b]">{suiteName(suiteId)}</h3>
                       <p className="text-xs text-muted-foreground">
-                        {cases.length} test case{cases.length !== 1 ? 's' : ''}
+                        {cases.length} {t('testCasesPage.testCases')}
                       </p>
                     </div>
                   </div>
@@ -327,7 +327,7 @@ export function TestCasesPage() {
                                       e.stopPropagation();
                                       startEditTitle(tc);
                                     }}
-                                    title="Click to edit title"
+                                    title={t('testCasesPage.clickToEditTitle')}
                                   >
                                     {tc.title}
                                   </span>
@@ -352,7 +352,7 @@ export function TestCasesPage() {
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-[#7c3aed]"
                                   onClick={() => startEditTitle(tc)}
-                                  title="Edit title"
+                                  title={t('common.edit')}
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
@@ -365,7 +365,7 @@ export function TestCasesPage() {
                                       deleteTestCase.mutate(tc.id);
                                     }
                                   }}
-                                  title="Delete"
+                                  title={t('common.delete')}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -378,7 +378,7 @@ export function TestCasesPage() {
                                 {/* Description */}
                                 {tc.description && (
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.description')}</p>
                                     <p className="text-sm text-[#1e1b4b]">{tc.description}</p>
                                   </div>
                                 )}
@@ -386,19 +386,19 @@ export function TestCasesPage() {
                                 {/* Module / Suite */}
                                 <div className="flex gap-6">
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Module / Suite</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.moduleSuite')}</p>
                                     <p className="text-sm text-[#1e1b4b]">{suiteName(tc.suite_id)}</p>
                                   </div>
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Type</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.type')}</p>
                                     <Badge variant="outline">{tc.test_type}</Badge>
                                   </div>
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Priority</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.priority')}</p>
                                     <Badge variant={priorityVariant(tc.priority)}>{tc.priority}</Badge>
                                   </div>
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Status</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.status')}</p>
                                     <Badge variant={statusVariant(tc.status)}>{tc.status}</Badge>
                                   </div>
                                 </div>
@@ -406,7 +406,7 @@ export function TestCasesPage() {
                                 {/* Tags */}
                                 {tc.tags.length > 0 && (
                                   <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Tags</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.tags')}</p>
                                     <div className="flex gap-1 flex-wrap">
                                       {tc.tags.map((tag) => (
                                         <Badge key={tag} variant="outline" className="text-xs bg-[#f5f3ff] text-[#7c3aed]">
@@ -421,7 +421,7 @@ export function TestCasesPage() {
                                 {tc.playwright_code && (
                                   <div>
                                     <div className="flex items-center justify-between mb-1">
-                                      <p className="text-xs font-medium text-muted-foreground">Code Preview</p>
+                                      <p className="text-xs font-medium text-muted-foreground">{t('testCasesPage.codePreview')}</p>
                                       <Button
                                         variant="outline"
                                         size="sm"
@@ -429,7 +429,7 @@ export function TestCasesPage() {
                                         onClick={() => setEditorTestCase(tc)}
                                       >
                                         <Code2 className="h-3 w-3" />
-                                        Edit Code
+                                        {t('testCasesPage.editCode')}
                                       </Button>
                                     </div>
                                     <pre className="rounded-md bg-[#1e1b4b] p-3 text-xs text-green-400 font-mono overflow-x-auto leading-relaxed">
@@ -453,14 +453,14 @@ export function TestCasesPage() {
                       <div className="px-5 py-3 border-t border-[#e9e5f5] bg-[#f5f3ff]/30">
                         {addFormSuiteId === suiteId && addForm ? (
                           <div className="space-y-3">
-                            <h4 className="text-sm font-semibold text-[#1e1b4b]">Add New Test Case</h4>
+                            <h4 className="text-sm font-semibold text-[#1e1b4b]">{t('testCasesPage.addNewTestCase')}</h4>
                             <Input
-                              placeholder="Test case title"
+                              placeholder={t('testCasesPage.titlePlaceholder')}
                               value={addForm.title}
                               onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
                             />
                             <Textarea
-                              placeholder="Description (optional)"
+                              placeholder={t('testCasesPage.descriptionPlaceholder')}
                               value={addForm.description}
                               onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
                               rows={2}
@@ -487,7 +487,7 @@ export function TestCasesPage() {
                             </div>
                             <div>
                               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                Playwright Code
+                                {t('testCasesPage.playwrightCode')}
                               </label>
                               <Textarea
                                 value={addForm.playwright_code}
@@ -497,7 +497,7 @@ export function TestCasesPage() {
                               />
                             </div>
                             <Input
-                              placeholder="Tags (comma-separated)"
+                              placeholder={t('testCasesPage.tagsPlaceholder')}
                               value={addForm.tags}
                               onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
                             />
@@ -507,7 +507,7 @@ export function TestCasesPage() {
                                 size="sm"
                                 onClick={() => { setAddForm(null); setAddFormSuiteId(null); }}
                               >
-                                Cancel
+                                {t('common.cancel')}
                               </Button>
                               <Button
                                 size="sm"
@@ -516,7 +516,7 @@ export function TestCasesPage() {
                                 disabled={!addForm.title.trim() || createTestCase.isPending}
                               >
                                 <Plus className="h-3.5 w-3.5" />
-                                {createTestCase.isPending ? 'Creating...' : 'Add Test Case'}
+                                {createTestCase.isPending ? t('testCasesPage.creating') : t('testCasesPage.addTestCase')}
                               </Button>
                             </div>
                           </div>
@@ -528,7 +528,7 @@ export function TestCasesPage() {
                             onClick={() => openAddForm(suiteId)}
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            Add Test Case
+                            {t('testCasesPage.addTestCase')}
                           </Button>
                         )}
                       </div>

@@ -321,15 +321,15 @@ export function GenerateTestsPage() {
                 <PhaseIcon phase={phase} />
                 <div>
                   <p className="text-sm font-medium text-[#1e1b4b]">
-                    {phase === 'extracting' && 'Extracting web content...'}
-                    {phase === 'generating' && 'AI is writing tests in real-time...'}
-                    {phase === 'parsing' && 'Parsing generated tests...'}
-                    {phase === 'complete' && `Done! ${modules.length} modules, ${modules.reduce((s, m) => s + (m.test_cases?.length || 0), 0)} test cases`}
-                    {phase === 'error' && 'Generation failed'}
+                    {phase === 'extracting' && t('generate.extracting')}
+                    {phase === 'generating' && t('generate.writingTests')}
+                    {phase === 'parsing' && t('generate.parsingTests')}
+                    {phase === 'complete' && t('generate.doneModules', { modules: modules.length, testCases: modules.reduce((s, m) => s + (m.test_cases?.length || 0), 0) })}
+                    {phase === 'error' && t('generate.generationFailed')}
                   </p>
                   {phase === 'generating' && (
                     <p className="text-xs text-muted-foreground">
-                      {streamText.length.toLocaleString()} characters generated
+                      {t('generate.charsGenerated', { count: streamText.length.toLocaleString() })}
                     </p>
                   )}
                 </div>
@@ -339,7 +339,7 @@ export function GenerateTestsPage() {
                   <Button variant="outline" size="sm" onClick={handleCancel}
                     className="gap-1 border-[#ef4444] text-[#ef4444] hover:bg-red-50">
                     <XCircle className="h-3.5 w-3.5" />
-                    Cancel
+                    {t('generate.cancel')}
                   </Button>
                 )}
                 {phase === 'complete' && !saved && (
@@ -347,17 +347,17 @@ export function GenerateTestsPage() {
                     <Button size="sm" onClick={handleSave} disabled={saving}
                       className="gap-1 bg-[#10b981] hover:bg-[#059669]">
                       {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                      {saving ? 'Saving...' : 'Save to Project'}
+                      {saving ? t('generate.saving') : t('generate.saveToProject')}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => { setPhase('idle'); setStreamText(''); }}
                       className="gap-1">
-                      <RotateCcw className="h-3.5 w-3.5" /> Retry
+                      <RotateCcw className="h-3.5 w-3.5" /> {t('generate.retry')}
                     </Button>
                   </>
                 )}
                 {phase === 'error' && (
                   <Button variant="outline" size="sm" onClick={() => setPhase('idle')} className="gap-1">
-                    <RotateCcw className="h-3.5 w-3.5" /> Retry
+                    <RotateCcw className="h-3.5 w-3.5" /> {t('generate.retry')}
                   </Button>
                 )}
               </div>
@@ -368,7 +368,7 @@ export function GenerateTestsPage() {
           {phase === 'error' && error && (
             <Card className="border-[#ef4444] bg-red-50">
               <CardContent className="p-4 text-sm text-[#ef4444]">
-                <strong>Error:</strong> {error}
+                <strong>{t('generate.error')}:</strong> {error}
               </CardContent>
             </Card>
           )}
@@ -380,10 +380,10 @@ export function GenerateTestsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-sm font-medium text-[#1e1b4b]">
                     <Terminal className="h-4 w-4" />
-                    AI Output — Live Stream
+                    {t('generate.aiOutputStream')}
                   </CardTitle>
                   <Badge variant="outline" className="text-xs font-mono">
-                    {streamText.length.toLocaleString()} chars
+                    {streamText.length.toLocaleString()} {t('generate.chars')}
                   </Badge>
                 </div>
               </CardHeader>
@@ -408,7 +408,7 @@ export function GenerateTestsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base font-semibold text-[#1e1b4b]">
-                  Generated Modules ({modules.length})
+                  {t('generate.generatedModules', { count: modules.length })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -416,7 +416,7 @@ export function GenerateTestsPage() {
                   <div key={i} className="rounded-lg border p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-[#1e1b4b]">{mod.name}</h4>
-                      <Badge variant="info">{mod.test_cases?.length || 0} tests</Badge>
+                      <Badge variant="info">{mod.test_cases?.length || 0} {t('generate.tests')}</Badge>
                     </div>
                     {mod.description && (
                       <p className="text-xs text-muted-foreground mb-3">{mod.description}</p>
@@ -445,12 +445,12 @@ export function GenerateTestsPage() {
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-[#10b981]" />
                   <span className="text-sm font-medium text-[#10b981]">
-                    Tests saved successfully! View them in your project.
+                    {t('generate.savedSuccess')}
                   </span>
                 </div>
                 <Button size="sm" onClick={() => navigate(`/projects/${id}/modules`)}
                   className="gap-1 bg-[#7c3aed] hover:bg-[#6d28d9]">
-                  <Eye className="h-3.5 w-3.5" /> View Modules
+                  <Eye className="h-3.5 w-3.5" /> {t('generate.viewModules')}
                 </Button>
               </CardContent>
             </Card>

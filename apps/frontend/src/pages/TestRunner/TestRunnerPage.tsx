@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useTestRuns } from '@/hooks/use-test-runs';
-import { useTestSuites, useTestCases } from '@/hooks/use-test-cases';
+import { useTestSuites, useTestCases, useDeleteTestSuite } from '@/hooks/use-test-cases';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import {
   FileCode,
   ListChecks,
   Tag,
+  Trash2,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -75,6 +76,10 @@ function downloadBlob(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+const MAC_COMMAND = `cd ~/Downloads && mkdir -p qa-tests && mv generated-tests.spec.ts qa-tests/ && cd qa-tests && npm init -y > /dev/null 2>&1 && npm i -D @playwright/test > /dev/null 2>&1 && npx playwright install chromium > /dev/null 2>&1 && npx playwright test tests.spec.ts --project=chromium --reporter=html && npx playwright show-report`;
+
+const WINDOWS_COMMAND = `cd $env:USERPROFILE\\Downloads; mkdir qa-tests -Force | Out-Null; mv generated-tests.spec.ts qa-tests\\; cd qa-tests; npm init -y 2>$null; npm i -D @playwright/test 2>$null; npx playwright install chromium 2>$null; npx playwright test tests.spec.ts --project=chromium --reporter=html; npx playwright show-report`;
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -88,6 +93,9 @@ export function TestRunnerPage() {
   const { data: allCases } = useTestCases(projectId!, { status: 'active' });
   const { data: runs, isLoading: runsLoading } = useTestRuns(projectId!);
 
+  /* Mutations */
+  const deleteTestSuite = useDeleteTestSuite(projectId!);
+
   /* Local state */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
@@ -95,7 +103,8 @@ export function TestRunnerPage() {
   const [browser, setBrowser] = useState('chromium');
   const [headless, setHeadless] = useState(true);
   const [copiedCli, setCopiedCli] = useState(false);
-  const [copiedCommand, setCopiedCommand] = useState(false);
+  const [activeTab, setActiveTab] = useState<'mac' | 'windows'>('mac');
+  const [copiedHowTo, setCopiedHowTo] = useState(false);
 
   /* Group test cases by suite */
   const grouped = useMemo<GroupedTests[]>(() => {
@@ -204,6 +213,23 @@ export function TestRunnerPage() {
     [],
   );
 
+  /* ---- Delete helpers ---- */
+
+  const handleDeleteSuite = (suiteId: string) => {
+    if (confirm(t('runner.confirmDeleteSuite'))) {
+      deleteTestSuite.mutate(suiteId);
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (!suites || suites.length === 0) return;
+    if (confirm(t('runner.confirmDeleteAll'))) {
+      suites.forEach((suite) => {
+        deleteTestSuite.mutate(suite.id);
+      });
+    }
+  };
+
   /* ---- Export & CLI ---- */
 
   const cliCommand = `npx playwright test generated-tests.spec.ts --project=${browser}${headless ? '' : ' --headed'}`;
@@ -220,10 +246,10 @@ export function TestRunnerPage() {
     setTimeout(() => setCopiedCli(false), 2000);
   };
 
-  const handleCopyCommand = async () => {
-    await navigator.clipboard.writeText(cliCommand);
-    setCopiedCommand(true);
-    setTimeout(() => setCopiedCommand(false), 2000);
+  const handleCopyHowTo = async (command: string) => {
+    await navigator.clipboard.writeText(command);
+    setCopiedHowTo(true);
+    setTimeout(() => setCopiedHowTo(false), 2000);
   };
 
   /* ------------------------------------------------------------------ */
@@ -233,11 +259,24 @@ export function TestRunnerPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[#1e1b4b]">{t('testRunner.title')}</h1>
-        <p className="mt-1 text-muted-foreground">
-          {t('testRunner.subtitle', 'Select and organize test cases for your test plan')}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[#1e1b4b]">{t('runner.title')}</h1>
+          <p className="mt-1 text-muted-foreground">
+            {t('runner.subtitle')}
+          </p>
+        </div>
+        {grouped.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={deleteTestSuite.isPending}
+            className="gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" />
+            {t('runner.deleteAll')}
+          </Button>
+        )}
       </div>
 
       {/* ------------------------------------------------------------ */}
@@ -248,7 +287,7 @@ export function TestRunnerPage() {
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <ListChecks className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-              <p>{t('testRunner.noTestCases', 'No active test cases found. Generate tests first.')}</p>
+              <p>{t('runner.noTests')}</p>
             </CardContent>
           </Card>
         )}
@@ -262,12 +301,12 @@ export function TestRunnerPage() {
           return (
             <Card key={suite.id} className="overflow-hidden border-[#7c3aed]/20">
               {/* Suite header */}
-              <button
-                type="button"
-                onClick={() => toggleSuiteCollapse(suite.id)}
-                className="flex w-full items-center justify-between bg-[#f5f3ff] px-4 py-3 text-left hover:bg-[#ede9fe] transition-colors"
-              >
-                <div className="flex items-center gap-3">
+              <div className="flex w-full items-center justify-between bg-[#f5f3ff] px-4 py-3 hover:bg-[#ede9fe] transition-colors">
+                <button
+                  type="button"
+                  onClick={() => toggleSuiteCollapse(suite.id)}
+                  className="flex items-center gap-3 text-left flex-1"
+                >
                   {isCollapsed ? (
                     <ChevronRight className="h-4 w-4 text-[#7c3aed]" />
                   ) : (
@@ -276,24 +315,37 @@ export function TestRunnerPage() {
                   <span className="font-semibold text-[#1e1b4b]">{suite.name}</span>
                   <Badge variant="info">{TYPE_LABELS[suite.test_type] ?? suite.test_type}</Badge>
                   <span className="text-sm text-muted-foreground">
-                    ({selectedInSuite}/{cases.length} {t('testRunner.testsSelected', 'selected')})
+                    ({selectedInSuite}/{cases.length} {t('runner.selected')})
                   </span>
+                </button>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={allSelected}
+                      data-indeterminate={someSelected && !allSelected ? true : undefined}
+                      onCheckedChange={() => toggleSuiteAll(suite.id, cases)}
+                      className="border-[#7c3aed] data-[state=checked]:bg-[#7c3aed]"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {t('runner.selectAll')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSuite(suite.id);
+                    }}
+                    className="rounded p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title={t('runner.deleteSuite')}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <div
-                  className="flex items-center gap-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={allSelected}
-                    data-indeterminate={someSelected && !allSelected ? true : undefined}
-                    onCheckedChange={() => toggleSuiteAll(suite.id, cases)}
-                    className="border-[#7c3aed] data-[state=checked]:bg-[#7c3aed]"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {t('testRunner.selectAll', 'Select all')}
-                  </span>
-                </div>
-              </button>
+              </div>
 
               {/* Test case list */}
               {!isCollapsed && (
@@ -401,8 +453,8 @@ export function TestRunnerPage() {
       {/* Selection summary */}
       {totalTests > 0 && (
         <p className="text-sm font-medium text-[#7c3aed]">
-          {t('testRunner.selectedCount', 'Selected: {{selected}} of {{total}} tests', {
-            selected: selectedCount,
+          {t('runner.selectedCount', {
+            count: selectedCount,
             total: totalTests,
           })}
         </p>
@@ -422,7 +474,7 @@ export function TestRunnerPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Browser selector */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('testRunner.browser')}</label>
+              <label className="text-sm font-medium">{t('runner.browser')}</label>
               <select
                 value={browser}
                 onChange={(e) => setBrowser(e.target.value)}
@@ -437,7 +489,7 @@ export function TestRunnerPage() {
             {/* Headless toggle */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                {t('testRunner.headless', 'Headless')}
+                {t('runner.headless')}
               </label>
               <select
                 value={headless ? 'yes' : 'no'}
@@ -455,10 +507,11 @@ export function TestRunnerPage() {
             <Button
               onClick={handleExport}
               disabled={selectedCount === 0}
-              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white"
+              size="lg"
+              className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-base px-6 py-3"
             >
-              <Download className="mr-2 h-4 w-4" />
-              {t('testRunner.exportConfig', 'Export Playwright Config')}
+              <Download className="h-5 w-5" />
+              {t('runner.exportConfig')}
             </Button>
             <Button
               variant="outline"
@@ -472,45 +525,83 @@ export function TestRunnerPage() {
                 <Copy className="mr-2 h-4 w-4" />
               )}
               {copiedCli
-                ? t('testRunner.copied', 'Copied!')
-                : t('testRunner.copyCli', 'Copy CLI Command')}
+                ? t('runner.copied')
+                : t('runner.copyCli')}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* ------------------------------------------------------------ */}
-      {/*  How to Run                                                    */}
+      {/*  How to Run Your Tests                                        */}
       {/* ------------------------------------------------------------ */}
       <Card className="border-[#7c3aed]/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-[#1e1b4b]">
             <Terminal className="h-5 w-5 text-[#7c3aed]" />
-            {t('testRunner.howToRun', 'How to run')}
+            {t('runner.howToRun')}
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t('runner.howToRunDesc')}
+          </p>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md bg-[#1e1b4b] p-4 flex items-center justify-between gap-4">
-            <code className="text-sm text-green-300 font-mono">$ {cliCommand}</code>
+        <CardContent className="space-y-4">
+          {/* Steps */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-[#1e1b4b]">
+              {t('runner.step1')}
+            </p>
+            <p className="text-sm font-medium text-[#1e1b4b]">
+              {t('runner.step2')}
+            </p>
+          </div>
+
+          {/* OS Tabs */}
+          <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
             <button
               type="button"
-              onClick={handleCopyCommand}
-              className="shrink-0 rounded p-2 text-purple-300 hover:bg-white/10 transition-colors"
-              title={t('testRunner.copyCommand', 'Copy command')}
+              onClick={() => setActiveTab('mac')}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === 'mac'
+                  ? 'bg-white text-[#7c3aed] shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {copiedCommand ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {t('runner.mac')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('windows')}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === 'windows'
+                  ? 'bg-white text-[#7c3aed] shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t('runner.windows')}
             </button>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t(
-              'testRunner.howToRunHint',
-              'Export the test file above, then run this command in your project directory.',
-            )}
-          </p>
+
+          {/* Command block */}
+          <div className="rounded-md bg-[#1e1b4b] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <code className="text-sm text-green-300 font-mono break-all whitespace-pre-wrap leading-relaxed">
+                $ {activeTab === 'mac' ? MAC_COMMAND : WINDOWS_COMMAND}
+              </code>
+              <button
+                type="button"
+                onClick={() => handleCopyHowTo(activeTab === 'mac' ? MAC_COMMAND : WINDOWS_COMMAND)}
+                className="shrink-0 rounded p-2 text-purple-300 hover:bg-white/10 transition-colors"
+                title={t('runner.copyCli')}
+              >
+                {copiedHowTo ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -519,13 +610,13 @@ export function TestRunnerPage() {
       {/* ------------------------------------------------------------ */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">{t('testRunner.testRunHistory')}</CardTitle>
+          <CardTitle className="text-lg">{t('runner.runHistory')}</CardTitle>
         </CardHeader>
         <CardContent>
           {runsLoading ? (
             <p className="text-muted-foreground">{t('testRunner.loading')}</p>
           ) : !runs?.length ? (
-            <p className="text-sm text-muted-foreground">{t('testRunner.noTestRunsYet')}</p>
+            <p className="text-sm text-muted-foreground">{t('runner.noRuns')}</p>
           ) : (
             <div className="space-y-3">
               {runs.map((run) => (
