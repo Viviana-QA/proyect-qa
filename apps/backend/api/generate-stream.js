@@ -1,253 +1,153 @@
-/**
- * Streaming AI Test Generation Endpoint
- * 
- * This is a standalone Vercel Function (NOT part of NestJS) that:
- * 1. Validates the Supabase JWT
- * 2. Extracts the web page content via Jina AI Reader
- * 3. Streams Gemini's response directly to the frontend
- * 
- * Deployed at: /api/generate-stream
- * Method: POST
- * Body: { project_id, base_url, test_types[], project_name?, business_context? }
- */
-
-const { createClient } = require('@supabase/supabase-js');
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Streaming AI Test Generation — POST /api/generate-stream
 
 module.exports = async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
+
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    res.json({ info: 'Use POST', node: process.version });
     return;
   }
 
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
   try {
-    // 1. Validate auth
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    // Auth check
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
       res.status(401).json({ error: 'Missing authorization' });
       return;
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.substring(7)
-    );
-    if (authError || !user) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
-    }
-
-    const { base_url, test_types = ['e2e'], project_name, business_context } = req.body;
-    if (!base_url) {
-      res.status(400).json({ error: 'base_url is required' });
-      return;
-    }
-
-    // 2. Extract web content via Jina AI Reader (free, no API key needed)
-    const jinaUrl = `https://r.jina.ai/${base_url}`;
-    const jinaResponse = await fetch(jinaUrl, {
-      headers: {
-        'Accept': 'text/markdown',
-        'X-Return-Format': 'markdown',
-      },
-      signal: AbortSignal.timeout(15000),
+    const userRes = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      headers: { 'Authorization': auth, 'apikey': SUPABASE_KEY },
     });
+    if (!userRes.ok) { res.status(401).json({ error: 'Invalid token' }); return; }
 
-    if (!jinaResponse.ok) {
-      res.status(502).json({ 
-        error: 'Failed to extract web content',
-        detail: `Jina returned ${jinaResponse.status}` 
+    const body = req.body || {};
+    const base_url = body.base_url;
+    if (!base_url) { res.status(400).json({ error: 'base_url required' }); return; }
+
+    const test_types = body.test_types || ['e2e'];
+    const project_name = body.project_name || '';
+    const biz = body.business_context;
+
+    // Extract web via Jina AI
+    let page = '';
+    try {
+      const jina = await fetch('https://r.jina.ai/' + base_url, {
+        headers: { 'Accept': 'text/markdown' },
+        signal: AbortSignal.timeout(15000),
       });
+      if (!jina.ok) { res.status(502).json({ error: 'Jina error: ' + jina.status }); return; }
+      page = await jina.text();
+    } catch (e) {
+      res.status(502).json({ error: 'Web extraction failed: ' + e.message });
       return;
     }
 
-    const pageContent = await jinaResponse.text();
-    const truncatedContent = pageContent.substring(0, 12000); // Keep under token limits
+    const content = page.substring(0, 12000);
 
-    // 3. Build the Gemini prompt
-    const prompt = buildPrompt(truncatedContent, base_url, test_types, project_name, business_context);
+    // Build prompt
+    const ctx = biz ? '\nBusiness: ' + JSON.stringify(biz) : '';
+    const prompt = `You are an expert QA engineer. Analyze this web page and generate Playwright test cases.
 
-    // 4. Stream Gemini response
+Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
+
+PAGE CONTENT (Markdown):
+${content}
+
+INSTRUCTIONS:
+1. Divide into logical modules
+2. Generate ${test_types.join(', ')} tests using Playwright
+3. Use getByRole, getByLabel, getByText selectors
+4. Each test must be independent
+
+RETURN ONLY valid JSON (no markdown fences):
+{"modules":[{"name":"Module","description":"desc","test_cases":[{"title":"name","description":"what","test_type":"e2e","priority":"high","tags":["tag"],"code":"import { test, expect } from '@playwright/test';\\ntest('name', async ({ page }) => { await page.goto('${base_url}'); });"}]}]}`;
+
+    // SSE streaming
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    // Send initial event
-    sendSSE(res, 'status', { step: 'extracting', message: 'Web content extracted successfully' });
-    sendSSE(res, 'status', { step: 'generating', message: 'AI is generating test cases...' });
+    res.write('event: status\ndata: ' + JSON.stringify({ step: 'extracting', message: 'Web content extracted (' + content.length + ' chars)' }) + '\n\n');
+    res.write('event: status\ndata: ' + JSON.stringify({ step: 'generating', message: 'AI generating tests...' }) + '\n\n');
 
-    // Call Gemini streaming API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
-    
-    const geminiResponse = await fetch(geminiUrl, {
+    // Gemini streaming
+    const gUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?key=' + GEMINI_KEY + '&alt=sse';
+    const gRes = await fetch(gUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 8192,
-        },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
       }),
     });
 
-    if (!geminiResponse.ok) {
-      const errBody = await geminiResponse.text();
-      sendSSE(res, 'error', { message: `Gemini API error: ${geminiResponse.status}` });
+    if (!gRes.ok) {
+      res.write('event: error\ndata: ' + JSON.stringify({ message: 'Gemini error: ' + gRes.status }) + '\n\n');
       res.end();
       return;
     }
 
-    // Read the SSE stream from Gemini and forward chunks to client
-    const reader = geminiResponse.body.getReader();
-    const decoder = new TextDecoder();
-    let fullText = '';
-    let buffer = '';
+    const reader = gRes.body.getReader();
+    const dec = new TextDecoder();
+    let full = '';
+    let buf = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      
-      // Parse SSE events from Gemini
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.substring(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              fullText += text;
-              sendSSE(res, 'chunk', { text });
-            }
-          } catch {
-            // Skip malformed JSON chunks
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const ln of lines) {
+        if (!ln.startsWith('data: ')) continue;
+        const j = ln.substring(6).trim();
+        if (j === '[DONE]') continue;
+        try {
+          const p = JSON.parse(j);
+          const t = p?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (t) {
+            full += t;
+            res.write('event: chunk\ndata: ' + JSON.stringify({ text: t }) + '\n\n');
           }
-        }
+        } catch {}
       }
     }
 
-    // 5. Parse the completed response and send final event
-    sendSSE(res, 'status', { step: 'parsing', message: 'Parsing generated tests...' });
-    
-    let parsedModules = [];
-    try {
-      parsedModules = parseGeneratedTests(fullText);
-    } catch (parseErr) {
-      // If JSON parsing fails, send the raw text as a single module
-      parsedModules = [{
-        name: 'Generated Tests',
-        description: 'AI-generated test cases',
-        test_cases: [{
-          title: 'Generated Test Suite',
-          description: 'Tests generated by AI',
-          test_type: 'e2e',
-          priority: 'medium',
-          code: fullText,
-          tags: [],
-        }],
-      }];
-    }
+    // Parse result
+    res.write('event: status\ndata: ' + JSON.stringify({ step: 'parsing', message: 'Parsing...' }) + '\n\n');
 
-    sendSSE(res, 'complete', {
-      modules: parsedModules,
-      summary: {
-        modules_count: parsedModules.length,
-        test_cases_count: parsedModules.reduce((sum, m) => sum + (m.test_cases?.length || 0), 0),
-      },
-    });
-    
-    res.end();
-
-  } catch (err) {
+    let mods = [];
     try {
-      if (!res.headersSent) {
-        res.status(500).json({ error: err.message });
-      } else {
-        sendSSE(res, 'error', { message: err.message });
-        res.end();
-      }
+      let c = full.trim();
+      if (c.startsWith('```json')) c = c.substring(7);
+      if (c.startsWith('```')) c = c.substring(3);
+      if (c.endsWith('```')) c = c.substring(0, c.length - 3);
+      const parsed = JSON.parse(c.trim());
+      mods = Array.isArray(parsed) ? parsed : (parsed.modules || [parsed]);
     } catch {
+      mods = [{ name: 'Generated Tests', description: 'AI tests', test_cases: [{ title: 'Generated Suite', description: '', test_type: 'e2e', priority: 'medium', code: full, tags: [] }] }];
+    }
+
+    res.write('event: complete\ndata: ' + JSON.stringify({
+      modules: mods,
+      summary: { modules_count: mods.length, test_cases_count: mods.reduce(function(s, m) { return s + (m.test_cases ? m.test_cases.length : 0); }, 0) },
+    }) + '\n\n');
+
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || 'Server error' });
+    } else {
+      try { res.write('event: error\ndata: ' + JSON.stringify({ message: err.message }) + '\n\n'); } catch {}
       res.end();
     }
   }
 };
-
-function sendSSE(res, event, data) {
-  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-}
-
-function buildPrompt(pageContent, baseUrl, testTypes, projectName, businessContext) {
-  const typesStr = testTypes.join(', ');
-  const contextStr = businessContext 
-    ? `\nBusiness Context: ${JSON.stringify(businessContext)}`
-    : '';
-
-  return `You are an expert QA automation engineer. Analyze the following web page and generate Playwright test cases.
-
-Website: ${baseUrl}${projectName ? ` (${projectName})` : ''}${contextStr}
-
-PAGE CONTENT (extracted as Markdown):
-${pageContent}
-
-INSTRUCTIONS:
-1. Analyze the page structure, navigation, forms, interactive elements, and content
-2. Divide the application into logical modules (e.g., "Authentication", "Navigation", "Forms", "Content Display")
-3. For each module, generate ${typesStr} test cases using Playwright
-4. Use accessible selectors: getByRole, getByLabel, getByText, getByPlaceholder
-5. Each test must be self-contained and independent
-
-RETURN FORMAT (JSON):
-{
-  "modules": [
-    {
-      "name": "Module Name",
-      "description": "What this module covers",
-      "test_cases": [
-        {
-          "title": "descriptive test name",
-          "description": "what this test validates",
-          "test_type": "e2e",
-          "priority": "high",
-          "tags": ["login", "auth"],
-          "code": "import { test, expect } from '@playwright/test';\\n\\ntest('test name', async ({ page }) => {\\n  await page.goto('${baseUrl}');\\n  // test steps\\n});"
-        }
-      ]
-    }
-  ]
-}
-
-Generate comprehensive, production-ready test cases. Return ONLY valid JSON.`;
-}
-
-function parseGeneratedTests(text) {
-  // Strip markdown code fences if present
-  let cleaned = text.trim();
-  if (cleaned.startsWith('```json')) cleaned = cleaned.substring(7);
-  if (cleaned.startsWith('```')) cleaned = cleaned.substring(3);
-  if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.length - 3);
-  cleaned = cleaned.trim();
-
-  const parsed = JSON.parse(cleaned);
-  return Array.isArray(parsed) ? parsed : (parsed.modules || [parsed]);
-}

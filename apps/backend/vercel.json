@@ -7,17 +7,13 @@
     },
     {
       "src": "api/generate-stream.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/generate-stream",
-      "dest": "api/generate-stream.js",
-      "methods": ["POST", "OPTIONS"]
+      "dest": "api/generate-stream.js"
     },
     {
       "src": "/(.*)",
