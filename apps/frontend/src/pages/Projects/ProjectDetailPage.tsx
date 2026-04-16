@@ -264,6 +264,7 @@ export function ProjectDetailPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const variants: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary' | 'info'> = {
     pending: 'secondary',
     queued: 'secondary',
@@ -272,7 +273,7 @@ function StatusBadge({ status }: { status: string }) {
     failed: 'destructive',
     cancelled: 'info',
   };
-  return <Badge variant={variants[status] || 'secondary'} className="capitalize">{status}</Badge>;
+  return <Badge variant={variants[status] || 'secondary'}>{t(`status.${status}`, status)}</Badge>;
 }
 
 function EnvironmentBadge({ environment }: { environment: string }) {

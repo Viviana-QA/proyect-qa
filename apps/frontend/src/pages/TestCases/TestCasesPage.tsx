@@ -338,10 +338,10 @@ export function TestCasesPage() {
                                     {tc.test_type}
                                   </Badge>
                                   <Badge variant={priorityVariant(tc.priority)} className="text-[10px] px-1.5 py-0">
-                                    {tc.priority}
+                                    {t(`priority.${tc.priority}`, tc.priority)}
                                   </Badge>
                                   <Badge variant={statusVariant(tc.status)} className="text-[10px] px-1.5 py-0">
-                                    {tc.status}
+                                    {t(`status.${tc.status}`, tc.status)}
                                   </Badge>
                                 </div>
                               </div>
@@ -395,11 +395,11 @@ export function TestCasesPage() {
                                   </div>
                                   <div>
                                     <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.priority')}</p>
-                                    <Badge variant={priorityVariant(tc.priority)}>{tc.priority}</Badge>
+                                    <Badge variant={priorityVariant(tc.priority)}>{t(`priority.${tc.priority}`, tc.priority)}</Badge>
                                   </div>
                                   <div>
                                     <p className="text-xs font-medium text-muted-foreground mb-1">{t('testCasesPage.status')}</p>
-                                    <Badge variant={statusVariant(tc.status)}>{tc.status}</Badge>
+                                    <Badge variant={statusVariant(tc.status)}>{t(`status.${tc.status}`, tc.status)}</Badge>
                                   </div>
                                 </div>
 

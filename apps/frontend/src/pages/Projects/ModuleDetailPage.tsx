@@ -175,15 +175,15 @@ function TestCaseRow({
           </Badge>
           <Badge
             variant={priorityVariant[testCase.priority] ?? 'secondary'}
-            className="text-[10px] capitalize"
+            className="text-[10px]"
           >
-            {testCase.priority}
+            {t(`priority.${testCase.priority}`, testCase.priority)}
           </Badge>
           <Badge
             variant={statusVariant[testCase.status] ?? 'secondary'}
-            className="text-[10px] capitalize"
+            className="text-[10px]"
           >
-            {testCase.status}
+            {t(`status.${testCase.status}`, testCase.status)}
           </Badge>
         </div>
       </div>

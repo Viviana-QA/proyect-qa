@@ -537,6 +537,26 @@
     "performance": "Performance",
     "api": "API Testing"
   },
+  "priority": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "status": {
+    "active": "Active",
+    "draft": "Draft",
+    "review": "Review",
+    "deprecated": "Deprecated",
+    "pending": "Pending",
+    "queued": "Queued",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "passed": "Passed",
+    "skipped": "Skipped"
+  },
   "common": {
     "loading": "Loading...",
     "save": "Save",

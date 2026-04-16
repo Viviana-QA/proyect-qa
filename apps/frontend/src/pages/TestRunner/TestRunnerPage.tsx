@@ -382,7 +382,7 @@ export function TestRunnerPage() {
 
                           {/* Badges */}
                           <Badge variant={PRIORITY_VARIANT[tc.priority] ?? 'secondary'} className="text-[10px]">
-                            {tc.priority}
+                            {t(`priority.${tc.priority}`, tc.priority)}
                           </Badge>
 
                           {/* Reorder buttons (visible when selected) */}
@@ -629,7 +629,7 @@ export function TestRunnerPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{run.browser}</span>
-                        <Badge variant="secondary">{run.status}</Badge>
+                        <Badge variant="secondary">{t(`status.${run.status}`, run.status)}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {new Date(run.created_at).toLocaleString()}

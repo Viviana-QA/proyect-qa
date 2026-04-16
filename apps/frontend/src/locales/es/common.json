@@ -537,6 +537,26 @@
     "performance": "Rendimiento",
     "api": "Pruebas de API"
   },
+  "priority": {
+    "critical": "Crítico",
+    "high": "Alto",
+    "medium": "Medio",
+    "low": "Bajo"
+  },
+  "status": {
+    "active": "Activo",
+    "draft": "Borrador",
+    "review": "En revisión",
+    "deprecated": "Obsoleto",
+    "pending": "Pendiente",
+    "queued": "En cola",
+    "running": "Ejecutando",
+    "completed": "Completado",
+    "failed": "Fallido",
+    "cancelled": "Cancelado",
+    "passed": "Aprobado",
+    "skipped": "Omitido"
+  },
   "common": {
     "loading": "Cargando...",
     "save": "Guardar",
