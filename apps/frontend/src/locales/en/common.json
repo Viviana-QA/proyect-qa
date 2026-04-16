@@ -78,7 +78,23 @@
     "view": "View",
     "recentTestRuns": "Recent Test Runs",
     "noTestRunsYet": "No test runs yet.",
-    "runFirstTest": "Run your first test to see results here."
+    "runFirstTest": "Run your first test to see results here.",
+    "testRunStatusTitle": "Test Run Status",
+    "chartPassed": "Passed",
+    "chartFailed": "Failed",
+    "runningTitle": "Running...",
+    "runningDesc": "Test suite is executing",
+    "completedTitle": "All tests passed",
+    "completedTotal": "Total",
+    "completedPassed": "Passed",
+    "completedFailed": "Failed",
+    "failedTitle": "Test run failed",
+    "failedDesc": "{{count}} tests did not pass",
+    "viewDetails": "View Details",
+    "queuedTitle": "Queued",
+    "queuedDesc": "Waiting for agent...",
+    "parallelTip": "Tip: Tests run faster in parallel mode",
+    "runFirstTestButton": "Run your first test"
   },
   "projects": {
     "title": "Projects",
@@ -318,7 +334,13 @@
     "passed": "{{count}} passed",
     "failed": "{{count}} failed",
     "skipped": "{{count}} skipped",
-    "total": "{{count}} total"
+    "total": "{{count}} total",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "viewFullCode": "... view full code in test details",
+    "runOptions": "Run Options",
+    "headlessYes": "Yes",
+    "headlessNo": "No"
   },
   "reports": {
     "title": "Reports",
@@ -504,7 +526,16 @@
     "generatedModules": "Generated Modules ({{count}})",
     "tests": "tests",
     "savedSuccess": "Tests saved successfully! View them in your project.",
-    "viewModules": "View Modules"
+    "viewModules": "View Modules",
+    "saveFailed": "Failed to save: {{message}}"
+  },
+  "testTypes": {
+    "e2e": "E2E Testing",
+    "regression": "Regression Testing",
+    "visual": "Visual Regression",
+    "accessibility": "Accessibility",
+    "performance": "Performance",
+    "api": "API Testing"
   },
   "common": {
     "loading": "Loading...",

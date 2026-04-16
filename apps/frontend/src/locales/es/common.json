@@ -78,7 +78,23 @@
     "view": "Ver",
     "recentTestRuns": "Ejecuciones de Prueba Recientes",
     "noTestRunsYet": "Aun no hay ejecuciones de prueba.",
-    "runFirstTest": "Ejecuta tu primera prueba para ver los resultados aqui."
+    "runFirstTest": "Ejecuta tu primera prueba para ver los resultados aqui.",
+    "testRunStatusTitle": "Estado de Ejecución",
+    "chartPassed": "Pasaron",
+    "chartFailed": "Fallaron",
+    "runningTitle": "Ejecutando...",
+    "runningDesc": "La suite de tests está en ejecución",
+    "completedTitle": "Todos los tests pasaron",
+    "completedTotal": "Total",
+    "completedPassed": "Pasaron",
+    "completedFailed": "Fallaron",
+    "failedTitle": "Ejecución fallida",
+    "failedDesc": "{{count}} tests no pasaron",
+    "viewDetails": "Ver Detalles",
+    "queuedTitle": "En cola",
+    "queuedDesc": "Esperando al agente...",
+    "parallelTip": "Tip: Los tests corren más rápido en modo paralelo",
+    "runFirstTestButton": "Ejecuta tu primer test"
   },
   "projects": {
     "title": "Proyectos",
@@ -318,7 +334,13 @@
     "passed": "{{count}} aprobadas",
     "failed": "{{count}} fallidas",
     "skipped": "{{count}} omitidas",
-    "total": "{{count}} total"
+    "total": "{{count}} total",
+    "moveUp": "Subir",
+    "moveDown": "Bajar",
+    "viewFullCode": "... ver código completo en detalles del test",
+    "runOptions": "Opciones de Ejecución",
+    "headlessYes": "Sí",
+    "headlessNo": "No"
   },
   "reports": {
     "title": "Reportes",
@@ -504,7 +526,16 @@
     "generatedModules": "Modulos Generados ({{count}})",
     "tests": "pruebas",
     "savedSuccess": "Pruebas guardadas exitosamente! Velas en tu proyecto.",
-    "viewModules": "Ver Modulos"
+    "viewModules": "Ver Modulos",
+    "saveFailed": "Error al guardar: {{message}}"
+  },
+  "testTypes": {
+    "e2e": "Pruebas E2E",
+    "regression": "Pruebas de Regresión",
+    "visual": "Regresión Visual",
+    "accessibility": "Accesibilidad",
+    "performance": "Rendimiento",
+    "api": "Pruebas de API"
   },
   "common": {
     "loading": "Cargando...",

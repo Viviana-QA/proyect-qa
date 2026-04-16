@@ -304,11 +304,11 @@ export function DashboardPage() {
             <div className="mt-3 flex items-center gap-5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#7c3aed]" />
-                Passed
+                {t('dashboard.chartPassed')}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#ef4444]" />
-                Failed
+                {t('dashboard.chartFailed')}
               </span>
             </div>
           </CardContent>
@@ -318,7 +318,7 @@ export function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold text-[#1e1b4b]">
-              Test Run Status
+              {t('dashboard.testRunStatusTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -353,8 +353,8 @@ function TestRunStatus({
             <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#7c3aed]" />
           </span>
         </div>
-        <p className="text-sm font-semibold text-[#1e1b4b]">Running...</p>
-        <p className="mt-1 text-xs text-muted-foreground">Test suite is executing</p>
+        <p className="text-sm font-semibold text-[#1e1b4b]">{t('dashboard.runningTitle')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.runningDesc')}</p>
         <div className="mt-4 h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-[#f5f3ff]">
           <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-[#7c3aed] to-[#a78bfa]" />
         </div>
@@ -368,20 +368,19 @@ function TestRunStatus({
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(16,185,129,0.15)]">
           <CheckCircle2 className="h-6 w-6 text-[#10b981]" />
         </div>
-        <p className="text-sm font-semibold text-[#1e1b4b]">All tests passed</p>
-        <p className="mt-1 text-xs text-muted-foreground">Last run: 2 minutes ago</p>
+        <p className="text-sm font-semibold text-[#1e1b4b]">{t('dashboard.completedTitle')}</p>
         <div className="mt-4 grid w-full grid-cols-3 gap-3">
           <div className="rounded-lg bg-[#f5f3ff] p-2 text-center">
             <p className="text-lg font-bold text-[#7c3aed]">25</p>
-            <p className="text-[10px] text-muted-foreground">Total</p>
+            <p className="text-[10px] text-muted-foreground">{t('dashboard.completedTotal')}</p>
           </div>
           <div className="rounded-lg bg-[rgba(16,185,129,0.08)] p-2 text-center">
             <p className="text-lg font-bold text-[#10b981]">22</p>
-            <p className="text-[10px] text-muted-foreground">Passed</p>
+            <p className="text-[10px] text-muted-foreground">{t('dashboard.completedPassed')}</p>
           </div>
           <div className="rounded-lg bg-[rgba(239,68,68,0.08)] p-2 text-center">
             <p className="text-lg font-bold text-[#ef4444]">3</p>
-            <p className="text-[10px] text-muted-foreground">Failed</p>
+            <p className="text-[10px] text-muted-foreground">{t('dashboard.completedFailed')}</p>
           </div>
         </div>
       </div>
@@ -394,14 +393,14 @@ function TestRunStatus({
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(239,68,68,0.15)]">
           <AlertTriangle className="h-6 w-6 text-[#ef4444]" />
         </div>
-        <p className="text-sm font-semibold text-[#1e1b4b]">Test run failed</p>
-        <p className="mt-1 text-xs text-muted-foreground">3 tests did not pass</p>
+        <p className="text-sm font-semibold text-[#1e1b4b]">{t('dashboard.failedTitle')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.failedDesc', { count: 3 })}</p>
         <Button
           variant="outline"
           size="sm"
           className="mt-4 border-[#ef4444] text-xs text-[#ef4444] hover:bg-red-50"
         >
-          View Details <ArrowRight className="ml-1 h-3 w-3" />
+          {t('dashboard.viewDetails')} <ArrowRight className="ml-1 h-3 w-3" />
         </Button>
       </div>
     );
@@ -413,10 +412,10 @@ function TestRunStatus({
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(245,158,11,0.15)]">
           <Clock className="h-6 w-6 text-[#f59e0b]" />
         </div>
-        <p className="text-sm font-semibold text-[#1e1b4b]">Queued</p>
-        <p className="mt-1 text-xs text-muted-foreground">Waiting for agent...</p>
+        <p className="text-sm font-semibold text-[#1e1b4b]">{t('dashboard.queuedTitle')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.queuedDesc')}</p>
         <p className="mt-3 rounded-md bg-[#f5f3ff] px-3 py-2 text-[11px] text-[#7c3aed]">
-          Tip: Tests run faster in parallel mode
+          {t('dashboard.parallelTip')}
         </p>
       </div>
     );
@@ -437,7 +436,7 @@ function TestRunStatus({
         className="mt-4 bg-[#7c3aed] text-xs shadow-sm hover:bg-[#7c3aed]/90"
       >
         <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-        Run your first test
+        {t('dashboard.runFirstTestButton')}
       </Button>
     </div>
   );

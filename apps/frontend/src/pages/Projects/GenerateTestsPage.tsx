@@ -25,14 +25,7 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
-const TEST_TYPES = [
-  { value: 'e2e', label: 'E2E Testing' },
-  { value: 'regression', label: 'Regression Testing' },
-  { value: 'visual', label: 'Visual Regression' },
-  { value: 'accessibility', label: 'Accessibility' },
-  { value: 'performance', label: 'Performance' },
-  { value: 'api', label: 'API Testing' },
-];
+const TEST_TYPE_VALUES = ['e2e', 'regression', 'visual', 'accessibility', 'performance', 'api'] as const;
 
 type StreamPhase = 'idle' | 'extracting' | 'generating' | 'parsing' | 'complete' | 'error' | 'saving';
 
@@ -51,6 +44,10 @@ interface GeneratedModule {
 
 export function GenerateTestsPage() {
   const { t, i18n } = useTranslation();
+  const TEST_TYPES = TEST_TYPE_VALUES.map((value) => ({
+    value,
+    label: t(`testTypes.${value}`),
+  }));
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: project, isLoading } = useProject(id!);
@@ -238,7 +235,7 @@ export function GenerateTestsPage() {
 
       setSaved(true);
     } catch (err: any) {
-      setError(`Failed to save: ${err.message}`);
+      setError(t('generate.saveFailed', { message: err.message }));
     } finally {
       setSaving(false);
     }
