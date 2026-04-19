@@ -62,8 +62,32 @@ function codeSummary(code: string, maxLines = 8): string {
   return code.split('\n').slice(0, maxLines).join('\n');
 }
 
+/**
+ * Concatenates every test's playwright_code into a single spec file.
+ * Each case shipped by the AI includes its own `import { test, expect } from
+ * '@playwright/test'` — concatenating them raw causes "Duplicate declaration
+ * 'test'". We strip per-case imports and emit a single import at the top.
+ * Also removes stray ```typescript / ``` markdown fences that sometimes slip
+ * through from the LLM output.
+ */
 function generatePlaywrightFile(tests: TestCase[]): string {
-  return tests.map((tc) => tc.playwright_code).join('\n\n');
+  const cleaned = tests
+    .map((tc) => {
+      let code = tc.playwright_code || '';
+      // Strip markdown code fences
+      code = code.replace(/^```(?:typescript|ts|javascript|js)?\s*\n?/gim, '');
+      code = code.replace(/\n?```\s*$/gim, '');
+      // Strip every `import ... from '@playwright/test';` line
+      code = code.replace(
+        /^\s*import\s*\{[^}]*\}\s*from\s*['"]@playwright\/test['"];?\s*$/gim,
+        '',
+      );
+      return code.trim();
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  return `import { test, expect } from '@playwright/test';\n\n${cleaned}\n`;
 }
 
 function downloadBlob(content: string, filename: string) {
