@@ -55,22 +55,88 @@ module.exports = async function handler(req, res) {
     // Build prompt
     const ctx = biz ? '\nBusiness: ' + JSON.stringify(biz) : '';
     const langName = language === 'es' ? 'Spanish' : 'English';
-    const prompt = `You are an expert QA engineer. Analyze this web page and generate Playwright test cases.
+    const prompt = `You are an expert QA engineer. This platform is site-AGNOSTIC — the tests you generate MUST work regardless of the website's language, framework, or domain. You only know about this site what the PAGE CONTENT below tells you. Never assume anything not visible in the content.
 
 Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
 
-PAGE CONTENT (Markdown):
+PAGE CONTENT (Markdown extracted from the live page — this is the ONLY source of truth about the site):
 ${content}
 
-IMPORTANT: Write all test titles, descriptions, and module names in ${langName}. The code comments should also be in ${langName}. The code itself (Playwright API calls) stays in English.
+LANGUAGE FOR METADATA: titles, descriptions, module names, code comments → ${langName}.
+Code itself (Playwright API) is always in English.
 
-INSTRUCTIONS:
-1. Divide into logical modules
-2. Generate ${test_types.join(', ')} tests using Playwright
-3. Use getByRole, getByLabel, getByText selectors
-4. Each test must be independent
+═══════════════════════════════════════════════════════════════
+CRITICAL — SELECTOR STRATEGY (agnostic to any site, any language)
+═══════════════════════════════════════════════════════════════
 
-RETURN ONLY valid JSON (no markdown fences):
+Before writing a selector, ask yourself:
+  "Did I actually see this exact text/attribute in the PAGE CONTENT above?"
+  If NO → use a CSS attribute selector instead.
+
+PRIORITY ORDER (use the FIRST strategy that works):
+
+  1. **CSS selectors by semantic attribute** (BEST — language-independent, stable):
+     page.locator('input[type="email"]')         // any email field
+     page.locator('input[type="password"]')      // any password field
+     page.locator('input[type="submit"]')        // any submit input
+     page.locator('button[type="submit"]')       // any submit button
+     page.locator('form')                        // any form
+     page.locator('a[href*="signup"]')           // any link whose href contains "signup"
+
+  2. **CSS selectors by name/id attribute** (when visible in HTML):
+     page.locator('input[name="email"]')
+     page.locator('#login-form')
+     page.locator('[data-testid="login-btn"]')
+
+  3. **getByPlaceholder** ONLY if you see the EXACT placeholder in PAGE CONTENT:
+     page.getByPlaceholder('correo@ejemplo.com')
+
+  4. **getByRole with regex and /i flag** for buttons/links with visible text:
+     page.getByRole('button', { name: /log\\s*in|iniciar\\s*sesi[oó]n|entrar/i })
+     (use alternation to cover multiple possible labels across languages/wording)
+
+  5. **getByLabel** ONLY if you see the exact label text verbatim in PAGE CONTENT.
+     NEVER guess labels. If the page text shows "Contraseña", use 'Contraseña' — not 'Password'.
+
+  6. **getByText with regex** for visible copy assertions:
+     expect(page.getByText(/bienvenid|welcome/i)).toBeVisible();
+
+FORBIDDEN (these break silently on real sites):
+  ✗ Assuming labels in English ('Password', 'Email', 'Login') without seeing them in PAGE CONTENT
+  ✗ Hardcoded text strings without /i flag or regex alternation
+  ✗ Selectors that depend on specific framework class names (e.g. .ant-btn-primary) unless seen
+  ✗ Testing functionality you didn't observe in the page (e.g. "password reset" if no such link exists)
+
+═══════════════════════════════════════════════════════════════
+TEST STRUCTURE RULES
+═══════════════════════════════════════════════════════════════
+
+1. MODULE DETECTION: Divide tests into 2-5 modules based on what you actually SEE in the page:
+   - If you see a login form → "Autenticación" module
+   - If you see a nav bar → "Navegación" module
+   - If you see a checkout button → "Checkout" module
+   - Do NOT invent modules for features you can't confirm from the content.
+
+2. Generate ${test_types.join(', ')} tests
+
+3. Each test is fully independent — no shared state, each starts with page.goto()
+
+4. Every test starts with: await page.goto('${base_url}');
+
+5. Each test MUST have at least 2 expect() assertions so failures are attributable
+
+6. Prefer STABLE assertions:
+   - toHaveURL(regex) for navigation checks
+   - toBeVisible() for element presence
+   - toHaveTitle(regex) for page identity
+
+7. Each interactive test should have a defensive first step:
+   await expect(page.locator('body')).toBeVisible();   // page loaded at all
+   before interacting with anything else. This distinguishes "site down" from "test wrong".
+
+8. Use Playwright's auto-waiting — don't add waitForTimeout() unless absolutely needed.
+
+RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after):
 {"modules":[{"name":"Module","description":"desc","test_cases":[{"title":"name","description":"what","test_type":"e2e","priority":"high","tags":["tag"],"code":"import { test, expect } from '@playwright/test';\\ntest('name', async ({ page }) => { await page.goto('${base_url}'); });"}]}]}`;
 
     // SSE streaming
@@ -140,9 +206,70 @@ RETURN ONLY valid JSON (no markdown fences):
       mods = [{ name: 'Generated Tests', description: 'AI tests', test_cases: [{ title: 'Generated Suite', description: '', test_type: 'e2e', priority: 'medium', code: full, tags: [] }] }];
     }
 
+    // Post-process: harden selectors for robustness across any site/language.
+    // This is defense-in-depth — the prompt already asks the AI to do this,
+    // but we enforce it at the gate so bad selectors don't reach the user.
+    const pageContentLower = content.toLowerCase();
+    const seenInPage = (s) => pageContentLower.includes(String(s).toLowerCase());
+
+    function hardenCode(code) {
+      if (!code || typeof code !== 'string') return code;
+      let out = code;
+
+      // 1) Widen getByLabel/getByRole name-strings to regex when safe.
+      //    getByLabel('Password')   ->  getByLabel(/password|contraseña/i) if neither appears in page
+      //    { name: 'Log in' }       ->  { name: /log\s*in|iniciar\s*sesi[oó]n|entrar/i }
+      const LABEL_MAP = [
+        [/password|contraseña|contrasena/i, 'password|contraseña|contrasena'],
+        [/email|correo|e-mail/i,            'email|correo|e-?mail'],
+        [/user(name)?|usuario/i,            'user(name)?|usuario'],
+        [/log\s*in|sign\s*in|iniciar\s*sesi[oó]n|entrar|ingresar/i, 'log\\s*in|sign\\s*in|iniciar\\s*sesi[oó]n|entrar|ingresar'],
+        [/sign\s*up|register|registrarse|crear\s*cuenta/i,          'sign\\s*up|register|registrarse|crear\\s*cuenta'],
+        [/submit|enviar|continuar|siguiente/i,                       'submit|enviar|continuar|siguiente'],
+        [/search|buscar/i,                                           'search|buscar'],
+      ];
+
+      // getByLabel('X') / getByRole(..., { name: 'X' })  with string literal → regex
+      const rewriteStringArg = (full, quote, value) => {
+        if (!value) return full;
+        if (seenInPage(value)) return full; // exact text exists in page, keep as-is
+        for (const [rx, alt] of LABEL_MAP) {
+          if (rx.test(value)) {
+            // Replace the whole "quoted string" with a JS regex literal
+            return full.replace(quote + value + quote, '/' + alt + '/i');
+          }
+        }
+        return full;
+      };
+
+      out = out.replace(/getByLabel\(\s*(['"`])([^'"`]+)\1\s*\)/g, (m, q, v) => rewriteStringArg(m, q, v));
+      out = out.replace(/getByRole\([^)]*name:\s*(['"`])([^'"`]+)\1[^)]*\)/g, (m, q, v) => rewriteStringArg(m, q, v));
+
+      // 2) Ensure each test has at least a "page loaded" sanity assert near the top.
+      //    Insert right after page.goto(...) if no expect follows within the next 2 lines.
+      out = out.replace(/(await\s+page\.goto\([^)]+\);)(\s*\n)(?!\s*(?:await\s+expect|\/\/))/g,
+        (_match, goto, nl) => goto + nl + '  await expect(page.locator(\'body\')).toBeVisible();\n');
+
+      return out;
+    }
+
+    let warningsCount = 0;
+    for (const m of mods) {
+      if (!Array.isArray(m.test_cases)) continue;
+      for (const tc of m.test_cases) {
+        const before = tc.code || '';
+        tc.code = hardenCode(before);
+        if (tc.code !== before) warningsCount++;
+      }
+    }
+
     res.write('event: complete\ndata: ' + JSON.stringify({
       modules: mods,
-      summary: { modules_count: mods.length, test_cases_count: mods.reduce(function(s, m) { return s + (m.test_cases ? m.test_cases.length : 0); }, 0) },
+      summary: {
+        modules_count: mods.length,
+        test_cases_count: mods.reduce(function(s, m) { return s + (m.test_cases ? m.test_cases.length : 0); }, 0),
+        hardened_tests: warningsCount,
+      },
     }) + '\n\n');
 
     res.end();

@@ -1141,6 +1141,68 @@ export function TestRunnerPage() {
               💡 Este comando refleja tus opciones de arriba. Al cambiar una opción, el comando se actualiza automáticamente.
             </p>
           </div>
+
+          {/* How to read the Playwright HTML report */}
+          <details className="rounded-md border border-[#7c3aed]/20 bg-[#f5f3ff]/50 open:bg-[#f5f3ff]">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[#1e1b4b] hover:bg-[#ede9fe] rounded-md">
+              📖 Cómo leer el reporte de Playwright
+            </summary>
+            <div className="space-y-3 border-t border-[#7c3aed]/10 p-4 text-sm">
+              <p className="text-[#1e1b4b]">
+                Al terminar los tests, se abre un reporte en{' '}
+                <code className="rounded bg-white px-1.5 py-0.5 text-xs font-mono text-[#7c3aed]">http://localhost:9323</code>.
+                Así navegar:
+              </p>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="rounded-md bg-white p-3">
+                  <p className="mb-1 text-xs font-semibold text-[#1e1b4b]">🟢 Verde = pasó</p>
+                  <p className="text-xs text-muted-foreground">
+                    El test corrió y todas sus asserciones pasaron.
+                  </p>
+                </div>
+                <div className="rounded-md bg-white p-3">
+                  <p className="mb-1 text-xs font-semibold text-[#ef4444]">🔴 Rojo = falló</p>
+                  <p className="text-xs text-muted-foreground">
+                    Una assertion no pasó o un locator no encontró el elemento. Ver siguiente paso.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[#1e1b4b]">Para cada test fallido:</p>
+                <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+                  <li>
+                    <strong>Click en el nombre del test</strong> — se expande mostrando el error exacto y la línea de código.
+                  </li>
+                  <li>
+                    <strong>▶ Icono play</strong> al lado del nombre — reproduce el <em>video</em> de la ejecución.
+                  </li>
+                  <li>
+                    <strong>"View Trace"</strong> — abre un inspector interactivo con snapshots paso a paso, network, consola. <em>La herramienta más poderosa para debugging.</em>
+                  </li>
+                  <li>
+                    <strong>Screenshots</strong> — aparecen inline dentro del test expandido, capturadas en el momento del fallo.
+                  </li>
+                </ol>
+              </div>
+              <div className="rounded-md border-l-4 border-[#f59e0b] bg-[#fffbeb] p-3">
+                <p className="text-xs font-semibold text-[#92400e]">
+                  ⚠️ ¿Test falló con "Timeout waiting for..." o "locator not found"?
+                </p>
+                <p className="mt-1 text-xs text-[#92400e]/90">
+                  Significa que <strong>el selector del test no encontró el elemento en la página</strong>. Causas comunes:
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-[#92400e]/90">
+                  <li>El sitio cambió (ej: el botón "Login" ahora dice "Iniciar Sesión")</li>
+                  <li>El selector está en otro idioma que la página</li>
+                  <li>El elemento se renderiza después de algún evento que el test no espera</li>
+                  <li>El sitio está caído o redirige a otra URL</li>
+                </ul>
+                <p className="mt-2 text-xs text-[#92400e]/90">
+                  Edita el test en "Casos de Prueba" y vuelve a descargar el archivo.
+                </p>
+              </div>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
