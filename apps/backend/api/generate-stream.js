@@ -35,6 +35,9 @@ module.exports = async function handler(req, res) {
     const project_name = body.project_name || '';
     const biz = body.business_context;
     const language = body.language || 'en';
+    // Optional: structured flows pre-selected by the user via the explore step.
+    // When provided, the AI generates tests strictly for these flows + assertions.
+    const selected_flows = Array.isArray(body.selected_flows) ? body.selected_flows : null;
 
     // Extract web via Jina AI
     let page = '';
@@ -55,7 +58,43 @@ module.exports = async function handler(req, res) {
     // Build prompt
     const ctx = biz ? '\nBusiness: ' + JSON.stringify(biz) : '';
     const langName = language === 'es' ? 'Spanish' : 'English';
-    const prompt = `You are an expert QA engineer. This platform is site-AGNOSTIC — the tests you generate MUST work regardless of the website's language, framework, or domain. You only know about this site what the PAGE CONTENT below tells you. Never assume anything not visible in the content.
+
+    // If the user already ran the explore step and selected flows + assertions,
+    // build a highly-focused prompt that generates ONLY those specific flows.
+    let prompt;
+    if (selected_flows && selected_flows.length > 0) {
+      const flowsJson = JSON.stringify(selected_flows, null, 2);
+      prompt = `You are an expert QA engineer. Generate Playwright tests for EXACTLY the flows listed below — no more, no less. The user already explored the site and picked these specific flows and assertions.
+
+Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
+
+PAGE CONTENT (Markdown snapshot, for context on selectors):
+${content}
+
+METADATA LANGUAGE: ${langName}.
+
+SELECTED FLOWS TO GENERATE (one test per flow, using the provided assertions):
+${flowsJson}
+
+RULES:
+1. Generate EXACTLY one test per flow in the SELECTED FLOWS array above
+2. Group flows by their module_name into modules in the output
+3. Each test MUST include all assertions listed for that flow — use the assertion.code snippets verbatim
+4. Start every test with: await page.goto('${base_url}')
+5. Add a defensive sanity assertion right after goto(): await expect(page.locator('body')).toBeVisible()
+6. Use the flow.name as the test title (in ${langName})
+7. Use the flow.description as the test description (in ${langName})
+8. When writing user interactions (click, fill) before the assertions, follow the SELECTOR STRATEGY:
+   - CSS semantic (input[type="email"], button[type="submit"]) — preferred
+   - getByRole with regex /i flag
+   - getByLabel only if exact label visible in page content
+   - NEVER hardcode English labels without regex
+
+RETURN ONLY valid JSON (no markdown fences):
+{"modules":[{"name":"Module","description":"desc","test_cases":[{"title":"name","description":"what","test_type":"e2e","priority":"high","tags":["tag"],"code":"import { test, expect } from '@playwright/test';\\ntest('name', async ({ page }) => { await page.goto('${base_url}'); });"}]}]}`;
+    } else {
+      // Original prompt — generate from scratch without pre-selection
+      prompt = `You are an expert QA engineer. This platform is site-AGNOSTIC — the tests you generate MUST work regardless of the website's language, framework, or domain. You only know about this site what the PAGE CONTENT below tells you. Never assume anything not visible in the content.
 
 Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
 
@@ -138,6 +177,8 @@ TEST STRUCTURE RULES
 
 RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after):
 {"modules":[{"name":"Module","description":"desc","test_cases":[{"title":"name","description":"what","test_type":"e2e","priority":"high","tags":["tag"],"code":"import { test, expect } from '@playwright/test';\\ntest('name', async ({ page }) => { await page.goto('${base_url}'); });"}]}]}`;
+    }
+    // End of prompt selection (selected_flows vs from-scratch)
 
     // SSE streaming
     res.setHeader('Content-Type', 'text/event-stream');

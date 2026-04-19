@@ -8,12 +8,20 @@
     {
       "src": "api/generate-stream.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/explore-stream.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/generate-stream",
       "dest": "api/generate-stream.js"
+    },
+    {
+      "src": "/api/explore-stream",
+      "dest": "api/explore-stream.js"
     },
     {
       "src": "/(.*)",
