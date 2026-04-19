@@ -209,46 +209,75 @@ RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after)
     // Post-process: harden selectors for robustness across any site/language.
     // This is defense-in-depth — the prompt already asks the AI to do this,
     // but we enforce it at the gate so bad selectors don't reach the user.
-    const pageContentLower = content.toLowerCase();
-    const seenInPage = (s) => pageContentLower.includes(String(s).toLowerCase());
-
+    // Strategy: ALWAYS widen known semantic patterns to multi-language regex.
+    // A regex that includes the original literal is strictly safer than the
+    // literal itself, so there's no downside to always widening.
     function hardenCode(code) {
       if (!code || typeof code !== 'string') return code;
       let out = code;
 
-      // 1) Widen getByLabel/getByRole name-strings to regex when safe.
-      //    getByLabel('Password')   ->  getByLabel(/password|contraseña/i) if neither appears in page
-      //    { name: 'Log in' }       ->  { name: /log\s*in|iniciar\s*sesi[oó]n|entrar/i }
+      // Known semantic labels with multi-language alternations.
+      // When the AI emits any of these as a string literal in getByLabel/Role,
+      // we replace with a regex covering the common variants across languages.
       const LABEL_MAP = [
-        [/password|contraseña|contrasena/i, 'password|contraseña|contrasena'],
-        [/email|correo|e-mail/i,            'email|correo|e-?mail'],
-        [/user(name)?|usuario/i,            'user(name)?|usuario'],
-        [/log\s*in|sign\s*in|iniciar\s*sesi[oó]n|entrar|ingresar/i, 'log\\s*in|sign\\s*in|iniciar\\s*sesi[oó]n|entrar|ingresar'],
-        [/sign\s*up|register|registrarse|crear\s*cuenta/i,          'sign\\s*up|register|registrarse|crear\\s*cuenta'],
-        [/submit|enviar|continuar|siguiente/i,                       'submit|enviar|continuar|siguiente'],
-        [/search|buscar/i,                                           'search|buscar'],
+        { match: /^\s*(password|contrase[ñn]a)\s*$/i,                                         rx: 'password|contrase[ñn]a' },
+        { match: /^\s*(email|correo(\s+electr[oó]nico)?|e-?mail)\s*$/i,                       rx: 'email|correo(\\s+electr[oó]nico)?|e-?mail' },
+        { match: /^\s*(user(name)?|usuario)\s*$/i,                                             rx: 'user(name)?|usuario' },
+        { match: /^\s*(log\s*in|sign\s*in|iniciar\s*sesi[oó]n|entrar|ingresar|acceder)\s*$/i,  rx: 'log\\s*in|sign\\s*in|iniciar\\s*sesi[oó]n|entrar|ingresar|acceder' },
+        { match: /^\s*(sign\s*up|register|registrarse|crear\s*cuenta|reg[ií]strate)\s*$/i,     rx: 'sign\\s*up|register|registrarse|crear\\s*cuenta|reg[ií]strate' },
+        { match: /^\s*(submit|enviar|continuar|siguiente|next)\s*$/i,                          rx: 'submit|enviar|continuar|siguiente|next' },
+        { match: /^\s*(search|buscar|b[uú]squeda)\s*$/i,                                       rx: 'search|buscar|b[uú]squeda' },
+        { match: /^\s*(cancel|cancelar)\s*$/i,                                                 rx: 'cancel|cancelar' },
+        { match: /^\s*(delete|eliminar|borrar)\s*$/i,                                          rx: 'delete|eliminar|borrar' },
+        { match: /^\s*(save|guardar)\s*$/i,                                                    rx: 'save|guardar' },
+        { match: /^\s*(forgot(\s+(your\s+)?password)?|olvid[oó](\s+(su|tu)\s+contrase[ñn]a)?)\s*$/i, rx: 'forgot(\\s+(your\\s+)?password)?|olvid[oó](\\s+(su|tu)\\s+contrase[ñn]a)?' },
       ];
 
-      // getByLabel('X') / getByRole(..., { name: 'X' })  with string literal → regex
-      const rewriteStringArg = (full, quote, value) => {
-        if (!value) return full;
-        if (seenInPage(value)) return full; // exact text exists in page, keep as-is
-        for (const [rx, alt] of LABEL_MAP) {
-          if (rx.test(value)) {
-            // Replace the whole "quoted string" with a JS regex literal
-            return full.replace(quote + value + quote, '/' + alt + '/i');
+      const widenLiteral = (full, quote, value) => {
+        for (const { match, rx } of LABEL_MAP) {
+          if (match.test(value)) {
+            return full.replace(quote + value + quote, '/' + rx + '/i');
           }
         }
-        return full;
+        // Unknown label: still widen to regex with /i so case/whitespace variance doesn't break it
+        const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+        return full.replace(quote + value + quote, '/' + escaped + '/i');
       };
 
-      out = out.replace(/getByLabel\(\s*(['"`])([^'"`]+)\1\s*\)/g, (m, q, v) => rewriteStringArg(m, q, v));
-      out = out.replace(/getByRole\([^)]*name:\s*(['"`])([^'"`]+)\1[^)]*\)/g, (m, q, v) => rewriteStringArg(m, q, v));
+      // getByLabel('X')
+      out = out.replace(/getByLabel\(\s*(['"`])([^'"`]+)\1\s*\)/g, (m, q, v) => widenLiteral(m, q, v));
+      // getByRole('role', { name: 'X' })
+      out = out.replace(/getByRole\([^)]*name:\s*(['"`])([^'"`]+)\1[^)]*\)/g, (m, q, v) => widenLiteral(m, q, v));
+      // getByText('X') — widen to regex
+      out = out.replace(/getByText\(\s*(['"`])([^'"`]+)\1\s*\)/g, (m, q, v) => widenLiteral(m, q, v));
+      // getByPlaceholder('X') — widen to regex
+      out = out.replace(/getByPlaceholder\(\s*(['"`])([^'"`]+)\1\s*\)/g, (m, q, v) => widenLiteral(m, q, v));
 
-      // 2) Ensure each test has at least a "page loaded" sanity assert near the top.
-      //    Insert right after page.goto(...) if no expect follows within the next 2 lines.
-      out = out.replace(/(await\s+page\.goto\([^)]+\);)(\s*\n)(?!\s*(?:await\s+expect|\/\/))/g,
-        (_match, goto, nl) => goto + nl + '  await expect(page.locator(\'body\')).toBeVisible();\n');
+      // Harden common URL assertions — AIs love asserting /register but site uses /signup (or vice versa)
+      const URL_MAP = [
+        { match: /toHaveURL\(\s*\/[.*]*\\?\/?(register|signup|sign-?up)[^)]*\)/gi,
+          replace: "toHaveURL(/register|signup|sign-?up|crear.*cuenta|reg[ií]strate/i)" },
+        { match: /toHaveURL\(\s*\/[.*]*\\?\/?(login|signin|sign-?in)[^)]*\)/gi,
+          replace: "toHaveURL(/login|signin|sign-?in|sesi[oó]n|ingresar|entrar/i)" },
+      ];
+      for (const { match, replace } of URL_MAP) {
+        out = out.replace(match, replace);
+      }
+
+      // Harden fragile toHaveText('exact') on top-level elements — convert to toContainText with regex
+      // so "WIS3" assertion on h1 becomes "contains any text" instead of exact match.
+      // This makes the test verify the element exists with some text, not a specific brand name.
+      out = out.replace(
+        /expect\(\s*(page\.locator\(\s*(['"`])(h[1-6]|title|header)\2\s*\))\s*\)\.toHaveText\(\s*(['"`])([^'"`]+)\4\s*\)/g,
+        (_m, locator) => `expect(${locator}).toBeVisible()`,
+      );
+
+      // Ensure each test has a "page loaded" sanity assert right after goto().
+      // Distinguishes "site down" from "selector wrong" in the report.
+      out = out.replace(
+        /(await\s+page\.goto\([^)]+\);)(\s*\n)(?!\s*(?:await\s+expect\s*\(\s*page\.locator\(\s*['"`]body))/g,
+        (_m, goto, nl) => goto + nl + "  await expect(page.locator('body')).toBeVisible();\n",
+      );
 
       return out;
     }
