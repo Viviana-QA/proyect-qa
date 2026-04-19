@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+// Trim whitespace/newlines and strip trailing slashes — env vars can have
+// stray \n appended by Vercel when saved with quotes
+const API_URL = (import.meta.env.VITE_API_URL || '/api').trim().replace(/\/+$/, '');
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();

@@ -93,7 +93,9 @@ export function GenerateTestsPage() {
       if (!token) throw new Error('Not authenticated');
 
       // Remove /api suffix for the streaming endpoint since it's at the same level
-      const backendBase = API_URL.replace(/\/api\/?$/, '');
+      // Defensive: trim whitespace/newlines (env vars can have trailing \n) and
+      // strip trailing slashes + /api so we always hit exactly /api/generate-stream
+      const backendBase = API_URL.trim().replace(/\/+$/, '').replace(/\/api$/, '');
 
       const response = await fetch(`${backendBase}/api/generate-stream`, {
         method: 'POST',
