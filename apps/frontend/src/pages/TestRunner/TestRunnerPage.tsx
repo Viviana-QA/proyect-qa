@@ -76,9 +76,12 @@ function downloadBlob(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const MAC_COMMAND = `cd ~/Downloads && mkdir -p qa-tests && mv generated-tests.spec.ts qa-tests/ && cd qa-tests && npm init -y > /dev/null 2>&1 && npm i -D @playwright/test > /dev/null 2>&1 && npx playwright install chromium > /dev/null 2>&1 && npx playwright test tests.spec.ts --project=chromium --reporter=html && npx playwright show-report`;
+// One-liner that: moves the downloaded spec into an isolated folder,
+// installs @playwright/test + chromium, writes a minimal playwright.config.ts
+// (so --project=chromium resolves), runs the tests, then opens the HTML report.
+const MAC_COMMAND = `cd ~/Downloads && mkdir -p qa-tests && mv generated-tests.spec.ts qa-tests/ && cd qa-tests && npm init -y > /dev/null 2>&1 && npm i -D @playwright/test > /dev/null 2>&1 && npx playwright install chromium > /dev/null 2>&1 && printf "import { defineConfig, devices } from '@playwright/test';\\nexport default defineConfig({ testDir: '.', reporter: 'html', projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }] });\\n" > playwright.config.ts && npx playwright test generated-tests.spec.ts --project=chromium --reporter=html; npx playwright show-report`;
 
-const WINDOWS_COMMAND = `cd $env:USERPROFILE\\Downloads; mkdir qa-tests -Force | Out-Null; mv generated-tests.spec.ts qa-tests\\; cd qa-tests; npm init -y 2>$null; npm i -D @playwright/test 2>$null; npx playwright install chromium 2>$null; npx playwright test tests.spec.ts --project=chromium --reporter=html; npx playwright show-report`;
+const WINDOWS_COMMAND = `cd $env:USERPROFILE\\Downloads; mkdir qa-tests -Force | Out-Null; mv generated-tests.spec.ts qa-tests\\; cd qa-tests; npm init -y 2>$null; npm i -D @playwright/test 2>$null; npx playwright install chromium 2>$null; "import { defineConfig, devices } from '@playwright/test';\`nexport default defineConfig({ testDir: '.', reporter: 'html', projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }] });" | Out-File -Encoding utf8 playwright.config.ts; npx playwright test generated-tests.spec.ts --project=chromium --reporter=html; npx playwright show-report`;
 
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
