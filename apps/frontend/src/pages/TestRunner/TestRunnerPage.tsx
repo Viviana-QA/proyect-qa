@@ -25,6 +25,17 @@ import {
   ListChecks,
   Tag,
   Trash2,
+  Eye,
+  EyeOff,
+  Video,
+  Camera,
+  Activity,
+  Globe,
+  MousePointerClick,
+  Keyboard,
+  Hourglass,
+  Pencil,
+  AlertCircle,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -140,62 +151,248 @@ function downloadBlob(content: string, filename: string, mime = 'text/plain') {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Playwright config encoded as base64.
- * Decodes to:
- *   import { defineConfig, devices } from '@playwright/test';
- *   export default defineConfig({
- *     testDir: '.',
- *     reporter: 'html',
- *     use: { trace: 'on-first-retry', screenshot: 'only-on-failure' },
- *     projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
- *   });
- *
- * Base64 avoids every shell-quoting edge case (nested quotes, newlines,
- * escape sequences) on both bash and PowerShell.
- */
-const PW_CONFIG_B64 =
-  'aW1wb3J0IHsgZGVmaW5lQ29uZmlnLCBkZXZpY2VzIH0gZnJvbSAnQHBsYXl3cmlnaHQvdGVzdCc7CmV4cG9ydCBkZWZhdWx0IGRlZmluZUNvbmZpZyh7CiAgdGVzdERpcjogJy4nLAogIHJlcG9ydGVyOiAnaHRtbCcsCiAgdXNlOiB7IHRyYWNlOiAnb24tZmlyc3QtcmV0cnknLCBzY3JlZW5zaG90OiAnb25seS1vbi1mYWlsdXJlJyB9LAogIHByb2plY3RzOiBbeyBuYW1lOiAnY2hyb21pdW0nLCB1c2U6IHsgLi4uZGV2aWNlc1snRGVza3RvcCBDaHJvbWUnXSB9IH1dLAp9KTsK';
+/* ------------------------------------------------------------------ */
+/*  Reactive Playwright config + command builders                      */
+/* ------------------------------------------------------------------ */
+
+type BrowserId = 'chromium' | 'firefox' | 'webkit';
+type VideoMode = 'off' | 'on' | 'retain-on-failure';
+type ScreenshotMode = 'off' | 'only-on-failure' | 'on';
+type TraceMode = 'off' | 'on-first-retry' | 'on' | 'retain-on-failure';
+
+interface RunConfig {
+  browser: BrowserId;
+  headed: boolean;       // true = visible browser window
+  video: VideoMode;
+  screenshot: ScreenshotMode;
+  trace: TraceMode;
+  slowMo: number;        // ms — 0 = normal speed, 250+ = easier to watch
+}
+
+const DEVICE_BY_BROWSER: Record<BrowserId, string> = {
+  chromium: 'Desktop Chrome',
+  firefox: 'Desktop Firefox',
+  webkit: 'Desktop Safari',
+};
+
+/** Generates playwright.config.ts content as a string based on run options. */
+function buildPlaywrightConfig(cfg: RunConfig): string {
+  return `import { defineConfig, devices } from '@playwright/test';
+export default defineConfig({
+  testDir: '.',
+  reporter: [['html', { open: 'never' }], ['list']],
+  timeout: 60000,
+  use: {
+    headless: ${!cfg.headed},
+    trace: '${cfg.trace}',
+    screenshot: '${cfg.screenshot}',
+    video: '${cfg.video}',
+    actionTimeout: 15000,
+    navigationTimeout: 30000,${cfg.slowMo > 0 ? `\n    launchOptions: { slowMo: ${cfg.slowMo} },` : ''}
+  },
+  projects: [{
+    name: '${cfg.browser}',
+    use: { ...devices['${DEVICE_BY_BROWSER[cfg.browser]}'] },
+  }],
+});
+`;
+}
+
+/** UTF-8-safe base64 encoder (btoa() only handles Latin-1). */
+function utf8ToBase64(str: string): string {
+  return btoa(
+    new TextEncoder()
+      .encode(str)
+      .reduce((acc, byte) => acc + String.fromCharCode(byte), ''),
+  );
+}
+
+function buildMacCommand(cfg: RunConfig, configB64: string): string {
+  return [
+    `command -v node >/dev/null 2>&1 || { echo "Instala Node.js primero: https://nodejs.org"; exit 1; }`,
+    `cd ~/Downloads`,
+    `mkdir -p qa-tests`,
+    `mv -f generated-tests.spec.ts qa-tests/ 2>/dev/null || true`,
+    `cd qa-tests`,
+    `[ -f package.json ] || npm init -y >/dev/null 2>&1`,
+    `[ -d node_modules/@playwright/test ] || npm i -D @playwright/test >/dev/null 2>&1`,
+    `npx -y playwright install ${cfg.browser} >/dev/null 2>&1`,
+    `echo ${configB64} | base64 -d > playwright.config.ts`,
+    `(npx playwright test generated-tests.spec.ts --project=${cfg.browser}${cfg.headed ? ' --headed' : ''} --reporter=html || true)`,
+    `npx playwright show-report`,
+  ].join(' && ');
+}
+
+function buildWindowsCommand(cfg: RunConfig, configB64: string): string {
+  return [
+    `if (!(Get-Command node -ErrorAction SilentlyContinue)) { Write-Host 'Instala Node.js primero: https://nodejs.org'; exit 1 }`,
+    `cd $env:USERPROFILE\\Downloads`,
+    `New-Item -ItemType Directory -Force qa-tests | Out-Null`,
+    `Move-Item -Force generated-tests.spec.ts qa-tests\\ -ErrorAction SilentlyContinue`,
+    `cd qa-tests`,
+    `if (!(Test-Path package.json)) { npm init -y 2>$null | Out-Null }`,
+    `if (!(Test-Path node_modules\\@playwright\\test)) { npm i -D @playwright/test 2>$null | Out-Null }`,
+    `npx -y playwright install ${cfg.browser} 2>$null | Out-Null`,
+    `[IO.File]::WriteAllBytes('playwright.config.ts', [Convert]::FromBase64String('${configB64}'))`,
+    `npx playwright test generated-tests.spec.ts --project=${cfg.browser}${cfg.headed ? ' --headed' : ''} --reporter=html`,
+    `npx playwright show-report`,
+  ].join('; ');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Human-readable action extractor                                    */
+/* ------------------------------------------------------------------ */
+
+type ActionKind =
+  | 'navigate'
+  | 'click'
+  | 'fill'
+  | 'press'
+  | 'assert'
+  | 'wait'
+  | 'screenshot'
+  | 'other';
+
+interface TestAction {
+  kind: ActionKind;
+  description: string;
+  rawLine: string;
+}
 
 /**
- * Bulletproof bash one-liner (macOS / Linux). Properties:
- *   - Checks `node` is installed; if not, shows an install link and stops
- *   - Idempotent: safe to re-run (reuses existing install)
- *   - Works with 1 test or N tests
- *   - Writes playwright.config.ts every time so --project=chromium resolves
- *   - Report auto-opens even if some tests fail (|| true keeps pipeline alive)
+ * Extract a human-readable step list from playwright code. Best-effort parser
+ * — recognizes the most common patterns and falls back to the raw line if it
+ * doesn't match. Purpose: let the user see at a glance WHAT each test does
+ * and WHAT is being asserted, without reading the code.
  */
-const MAC_COMMAND = [
-  `command -v node >/dev/null 2>&1 || { echo "Instala Node.js primero: https://nodejs.org"; exit 1; }`,
-  `cd ~/Downloads`,
-  `mkdir -p qa-tests`,
-  `mv -f generated-tests.spec.ts qa-tests/ 2>/dev/null || true`,
-  `cd qa-tests`,
-  `[ -f package.json ] || npm init -y >/dev/null 2>&1`,
-  `[ -d node_modules/@playwright/test ] || npm i -D @playwright/test >/dev/null 2>&1`,
-  `npx -y playwright install chromium >/dev/null 2>&1`,
-  `echo ${PW_CONFIG_B64} | base64 -d > playwright.config.ts`,
-  `(npx playwright test generated-tests.spec.ts --project=chromium --reporter=html || true)`,
-  `npx playwright show-report`,
-].join(' && ');
+function parseTestActions(code: string): TestAction[] {
+  const actions: TestAction[] = [];
+  const lines = code.split('\n');
 
-/**
- * Windows PowerShell equivalent. Same decode-from-base64 trick means no
- * multi-line here-strings or backtick-quote juggling.
- */
-const WINDOWS_COMMAND = [
-  `if (!(Get-Command node -ErrorAction SilentlyContinue)) { Write-Host 'Instala Node.js primero: https://nodejs.org'; exit 1 }`,
-  `cd $env:USERPROFILE\\Downloads`,
-  `New-Item -ItemType Directory -Force qa-tests | Out-Null`,
-  `Move-Item -Force generated-tests.spec.ts qa-tests\\ -ErrorAction SilentlyContinue`,
-  `cd qa-tests`,
-  `if (!(Test-Path package.json)) { npm init -y 2>$null | Out-Null }`,
-  `if (!(Test-Path node_modules\\@playwright\\test)) { npm i -D @playwright/test 2>$null | Out-Null }`,
-  `npx -y playwright install chromium 2>$null | Out-Null`,
-  `[IO.File]::WriteAllBytes('playwright.config.ts', [Convert]::FromBase64String('${PW_CONFIG_B64}'))`,
-  `npx playwright test generated-tests.spec.ts --project=chromium --reporter=html`,
-  `npx playwright show-report`,
-].join('; ');
+  // Helper to pull the first string literal out of a line as the "target"
+  const firstString = (s: string): string | null => {
+    const m = s.match(/['"`]([^'"`]+)['"`]/);
+    return m ? m[1] : null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('//') || line.startsWith('*')) continue;
+    if (/^(import|export|test\s*\(|test\.describe|\}\)|\{|\}|const|let|var)/.test(line)) continue;
+
+    // Navigation
+    let m = line.match(/page\.goto\(\s*['"`]([^'"`]+)['"`]/);
+    if (m) {
+      actions.push({ kind: 'navigate', description: `Navega a ${m[1]}`, rawLine: raw });
+      continue;
+    }
+
+    // Click
+    if (/\.click\s*\(/.test(line)) {
+      const selector = firstString(line) ?? 'un elemento';
+      actions.push({ kind: 'click', description: `Hace clic en "${selector}"`, rawLine: raw });
+      continue;
+    }
+
+    // Fill / type
+    m = line.match(/\.(?:fill|type)\(\s*['"`]([^'"`]*)['"`]/);
+    if (m) {
+      const selector = firstString(line.split('.fill')[0].split('.type')[0]) ?? 'un campo';
+      const value = m[1];
+      actions.push({
+        kind: 'fill',
+        description: `Escribe "${value}" en "${selector}"`,
+        rawLine: raw,
+      });
+      continue;
+    }
+
+    // Press key
+    m = line.match(/\.press\(\s*['"`]([^'"`]+)['"`]/);
+    if (m) {
+      actions.push({ kind: 'press', description: `Presiona ${m[1]}`, rawLine: raw });
+      continue;
+    }
+
+    // Screenshot
+    if (/\.screenshot\s*\(/.test(line)) {
+      actions.push({ kind: 'screenshot', description: 'Toma captura de pantalla', rawLine: raw });
+      continue;
+    }
+
+    // Waits
+    if (/waitForTimeout|waitForLoadState|waitForURL|waitForSelector/.test(line)) {
+      const target = firstString(line);
+      actions.push({
+        kind: 'wait',
+        description: target ? `Espera por "${target}"` : 'Espera',
+        rawLine: raw,
+      });
+      continue;
+    }
+
+    // Expect / assertions
+    if (/\bexpect\s*\(/.test(line)) {
+      let desc = 'Verifica condición';
+      if (/toHaveURL/.test(line)) {
+        const url = firstString(line);
+        desc = url ? `Verifica URL ≈ "${url}"` : 'Verifica URL';
+      } else if (/toHaveTitle/.test(line)) {
+        const title = firstString(line);
+        desc = title ? `Verifica título = "${title}"` : 'Verifica título';
+      } else if (/toHaveText|toContainText/.test(line)) {
+        const text = line.match(/to(?:Have|Contain)Text\(\s*['"`]([^'"`]+)['"`]/)?.[1];
+        desc = text ? `Verifica texto ≈ "${text}"` : 'Verifica texto';
+      } else if (/toHaveValue/.test(line)) {
+        const val = line.match(/toHaveValue\(\s*['"`]([^'"`]+)['"`]/)?.[1];
+        desc = val ? `Verifica valor = "${val}"` : 'Verifica valor';
+      } else if (/toBeVisible/.test(line)) {
+        const sel = firstString(line) ?? 'elemento';
+        desc = `Verifica que "${sel}" es visible`;
+      } else if (/toBeHidden/.test(line)) {
+        const sel = firstString(line) ?? 'elemento';
+        desc = `Verifica que "${sel}" está oculto`;
+      } else if (/toBeEnabled/.test(line)) {
+        const sel = firstString(line) ?? 'elemento';
+        desc = `Verifica que "${sel}" está habilitado`;
+      } else if (/toBeDisabled/.test(line)) {
+        const sel = firstString(line) ?? 'elemento';
+        desc = `Verifica que "${sel}" está deshabilitado`;
+      } else if (/toBeChecked/.test(line)) {
+        desc = 'Verifica que está marcado';
+      } else if (/toHaveCount/.test(line)) {
+        const n = line.match(/toHaveCount\(\s*(\d+)/)?.[1];
+        desc = n ? `Verifica que hay ${n} elementos` : 'Verifica cantidad';
+      }
+      actions.push({ kind: 'assert', description: desc, rawLine: raw });
+      continue;
+    }
+  }
+
+  return actions;
+}
+
+function iconForAction(kind: ActionKind) {
+  const cls = 'h-3.5 w-3.5 shrink-0';
+  switch (kind) {
+    case 'navigate':
+      return <Globe className={`${cls} text-[#3b82f6]`} />;
+    case 'click':
+      return <MousePointerClick className={`${cls} text-[#8b5cf6]`} />;
+    case 'fill':
+      return <Pencil className={`${cls} text-[#0ea5e9]`} />;
+    case 'press':
+      return <Keyboard className={`${cls} text-[#64748b]`} />;
+    case 'assert':
+      return <CheckCircle2 className={`${cls} text-[#10b981]`} />;
+    case 'wait':
+      return <Hourglass className={`${cls} text-[#f59e0b]`} />;
+    case 'screenshot':
+      return <Camera className={`${cls} text-[#ec4899]`} />;
+    default:
+      return <AlertCircle className={`${cls} text-muted-foreground`} />;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
@@ -217,11 +414,35 @@ export function TestRunnerPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
   const [collapsedSuites, setCollapsedSuites] = useState<Set<string>>(new Set());
-  const [browser, setBrowser] = useState('chromium');
-  const [headless, setHeadless] = useState(true);
+
+  /* Run config — all reactive. Changing any of these rebuilds the snippet */
+  const [browser, setBrowser] = useState<BrowserId>('chromium');
+  const [headed, setHeaded] = useState(true);               // visible browser by default
+  const [video, setVideo] = useState<VideoMode>('retain-on-failure');
+  const [screenshot, setScreenshot] = useState<ScreenshotMode>('only-on-failure');
+  const [trace, setTrace] = useState<TraceMode>('retain-on-failure');
+  const [slowMo, setSlowMo] = useState<number>(0);          // ms
+
   const [copiedCli, setCopiedCli] = useState(false);
   const [activeTab, setActiveTab] = useState<'mac' | 'windows'>('mac');
   const [copiedHowTo, setCopiedHowTo] = useState(false);
+
+  /* Reactive playwright config + commands — rebuild whenever options change */
+  const runConfig = useMemo<RunConfig>(
+    () => ({ browser, headed, video, screenshot, trace, slowMo }),
+    [browser, headed, video, screenshot, trace, slowMo],
+  );
+  const pwConfigString = useMemo(() => buildPlaywrightConfig(runConfig), [runConfig]);
+  const pwConfigB64 = useMemo(() => utf8ToBase64(pwConfigString), [pwConfigString]);
+  const macCommand = useMemo(
+    () => buildMacCommand(runConfig, pwConfigB64),
+    [runConfig, pwConfigB64],
+  );
+  const winCommand = useMemo(
+    () => buildWindowsCommand(runConfig, pwConfigB64),
+    [runConfig, pwConfigB64],
+  );
+  const activeCommand = activeTab === 'mac' ? macCommand : winCommand;
 
   /* Group test cases by suite */
   const grouped = useMemo<GroupedTests[]>(() => {
@@ -349,7 +570,12 @@ export function TestRunnerPage() {
 
   /* ---- Export & CLI ---- */
 
-  const cliCommand = `npx playwright test generated-tests.spec.ts --project=${browser}${headless ? '' : ' --headed'}`;
+  // Short CLI command for the small "Copy Command" button (reflects options)
+  const cliCommand = useMemo(
+    () =>
+      `npx playwright test generated-tests.spec.ts --project=${browser}${headed ? ' --headed' : ''}`,
+    [browser, headed],
+  );
 
   const handleExport = () => {
     if (selectedTests.length === 0) return;
@@ -527,9 +753,9 @@ export function TestRunnerPage() {
                           )}
                         </div>
 
-                        {/* Expanded detail */}
+                        {/* Expanded detail: readable actions + raw code */}
                         {isExpanded && (
-                          <div className="border-t bg-[#f5f3ff]/30 px-12 py-4 space-y-3">
+                          <div className="border-t bg-[#f5f3ff]/30 px-12 py-4 space-y-4">
                             {tc.description && (
                               <p className="text-sm text-muted-foreground">{tc.description}</p>
                             )}
@@ -545,16 +771,62 @@ export function TestRunnerPage() {
                               </div>
                             )}
 
-                            <div className="rounded-md bg-[#1e1b4b] p-4 overflow-auto">
-                              <pre className="text-xs text-green-300 font-mono whitespace-pre">
-                                {codeSummary(tc.playwright_code)}
+                            {/* Human-readable actions & assertions */}
+                            {(() => {
+                              const actions = parseTestActions(tc.playwright_code);
+                              if (actions.length === 0) return null;
+                              const assertCount = actions.filter((a) => a.kind === 'assert').length;
+                              const stepCount = actions.length - assertCount;
+                              return (
+                                <div className="rounded-md border border-[#7c3aed]/20 bg-white p-4">
+                                  <div className="mb-3 flex items-center justify-between">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-[#7c3aed]">
+                                      Qué hace esta prueba
+                                    </p>
+                                    <div className="flex gap-2 text-[10px]">
+                                      <Badge variant="info" className="text-[10px]">
+                                        {stepCount} pasos
+                                      </Badge>
+                                      <Badge variant="success" className="text-[10px]">
+                                        {assertCount} validaciones
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <ol className="space-y-1.5">
+                                    {actions.map((a, i) => (
+                                      <li
+                                        key={i}
+                                        className="flex items-start gap-2 text-xs leading-relaxed"
+                                      >
+                                        <span className="mt-0.5 w-5 shrink-0 text-right font-mono text-muted-foreground">
+                                          {i + 1}.
+                                        </span>
+                                        {iconForAction(a.kind)}
+                                        <span
+                                          className={
+                                            a.kind === 'assert'
+                                              ? 'font-medium text-[#065f46]'
+                                              : 'text-[#1e1b4b]'
+                                          }
+                                        >
+                                          {a.description}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Raw code preview (collapsible feel via max-height) */}
+                            <details className="rounded-md bg-[#1e1b4b] overflow-hidden">
+                              <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-purple-200 hover:bg-white/5">
+                                Ver código Playwright
+                              </summary>
+                              <pre className="border-t border-white/10 p-4 text-xs text-green-300 font-mono whitespace-pre overflow-auto max-h-80">
+                                {tc.playwright_code}
                               </pre>
-                              {tc.playwright_code.split('\n').length > 8 && (
-                                <p className="mt-2 text-xs text-purple-300">
-                                  {t('testRunner.viewFullCode', '... view full code in test details')}
-                                </p>
-                              )}
-                            </div>
+                            </details>
                           </div>
                         )}
                       </div>
@@ -578,49 +850,198 @@ export function TestRunnerPage() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/*  Run Options & Export                                          */}
+      {/*  Run Options & Export — reactive: snippet rebuilds on change   */}
       {/* ------------------------------------------------------------ */}
       <Card className="border-[#7c3aed]/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-[#1e1b4b]">
             <FileCode className="h-5 w-5 text-[#7c3aed]" />
-            {t('testRunner.runOptions', 'Run Options')}
+            Opciones de ejecución
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Cada cambio actualiza el comando de abajo en tiempo real.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6">
+          {/* Row 1: Browser + Visibility */}
           <div className="grid gap-4 sm:grid-cols-2">
-            {/* Browser selector */}
+            {/* Browser segmented */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('runner.browser')}</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Navegador
+              </label>
+              <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1">
+                {(['chromium', 'firefox', 'webkit'] as BrowserId[]).map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setBrowser(b)}
+                    className={`rounded-sm px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                      browser === b
+                        ? 'bg-white text-[#7c3aed] shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {b === 'webkit' ? 'Safari' : b}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visibility toggle (Headed vs Headless) */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Ventana del navegador
+              </label>
+              <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+                <button
+                  type="button"
+                  onClick={() => setHeaded(true)}
+                  className={`flex items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors ${
+                    headed
+                      ? 'bg-white text-[#7c3aed] shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Visible
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHeaded(false)}
+                  className={`flex items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors ${
+                    !headed
+                      ? 'bg-white text-[#7c3aed] shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Invisible (headless)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Video + Screenshot + Trace */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Video */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Video className="h-3.5 w-3.5" />
+                Grabación de video
+              </label>
               <select
-                value={browser}
-                onChange={(e) => setBrowser(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
+                value={video}
+                onChange={(e) => setVideo(e.target.value as VideoMode)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
               >
-                <option value="chromium">{t('testRunner.browserChromium')}</option>
-                <option value="firefox">{t('testRunner.browserFirefox')}</option>
-                <option value="webkit">{t('testRunner.browserWebkit')}</option>
+                <option value="off">Desactivado</option>
+                <option value="retain-on-failure">Solo si falla (recomendado)</option>
+                <option value="on">Siempre</option>
               </select>
             </div>
 
-            {/* Headless toggle */}
+            {/* Screenshot */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t('runner.headless')}
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Camera className="h-3.5 w-3.5" />
+                Capturas de pantalla
               </label>
               <select
-                value={headless ? 'yes' : 'no'}
-                onChange={(e) => setHeadless(e.target.value === 'yes')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
+                value={screenshot}
+                onChange={(e) => setScreenshot(e.target.value as ScreenshotMode)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
               >
-                <option value="yes">{t('testRunner.headlessYes', 'Yes')}</option>
-                <option value="no">{t('testRunner.headlessNo', 'No')}</option>
+                <option value="off">Desactivadas</option>
+                <option value="only-on-failure">Solo si falla (recomendado)</option>
+                <option value="on">En cada paso</option>
+              </select>
+            </div>
+
+            {/* Trace */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Activity className="h-3.5 w-3.5" />
+                Trace (inspector)
+              </label>
+              <select
+                value={trace}
+                onChange={(e) => setTrace(e.target.value as TraceMode)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
+              >
+                <option value="off">Desactivado</option>
+                <option value="retain-on-failure">Solo si falla (recomendado)</option>
+                <option value="on-first-retry">En reintento</option>
+                <option value="on">Siempre</option>
               </select>
             </div>
           </div>
 
+          {/* Row 3: SlowMo slider (only relevant when headed) */}
+          {headed && (
+            <div className="space-y-2">
+              <label className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Hourglass className="h-3.5 w-3.5" />
+                  Velocidad (slow-motion)
+                </span>
+                <span className="font-mono text-[#7c3aed]">
+                  {slowMo === 0 ? 'Normal' : `${slowMo}ms por acción`}
+                </span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1000}
+                step={50}
+                value={slowMo}
+                onChange={(e) => setSlowMo(Number(e.target.value))}
+                className="w-full accent-[#7c3aed]"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Útil para seguir visualmente lo que hace el test. 250ms es cómodo para observar.
+              </p>
+            </div>
+          )}
+
+          {/* Summary chips — what will happen when the user runs this */}
+          <div className="flex flex-wrap gap-2 rounded-md bg-[#f5f3ff] p-3">
+            <Badge variant="info" className="gap-1">
+              <Globe className="h-3 w-3" />
+              {browser}
+            </Badge>
+            <Badge variant={headed ? 'success' : 'secondary'} className="gap-1">
+              {headed ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              {headed ? 'Visible' : 'Headless'}
+            </Badge>
+            {video !== 'off' && (
+              <Badge variant="warning" className="gap-1">
+                <Video className="h-3 w-3" />
+                Video: {video === 'on' ? 'siempre' : 'al fallar'}
+              </Badge>
+            )}
+            {screenshot !== 'off' && (
+              <Badge variant="warning" className="gap-1">
+                <Camera className="h-3 w-3" />
+                Screenshots: {screenshot === 'on' ? 'siempre' : 'al fallar'}
+              </Badge>
+            )}
+            {trace !== 'off' && (
+              <Badge variant="info" className="gap-1">
+                <Activity className="h-3 w-3" />
+                Trace: {trace === 'on' ? 'siempre' : trace === 'on-first-retry' ? 'en reintento' : 'al fallar'}
+              </Badge>
+            )}
+            {slowMo > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                <Hourglass className="h-3 w-3" />
+                SlowMo {slowMo}ms
+              </Badge>
+            )}
+          </div>
+
           {/* Action buttons */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 border-t pt-4">
             <Button
               onClick={handleExport}
               disabled={selectedCount === 0}
@@ -628,7 +1049,7 @@ export function TestRunnerPage() {
               className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-base px-6 py-3"
             >
               <Download className="h-5 w-5" />
-              {t('runner.exportConfig')}
+              Descargar archivo de pruebas
             </Button>
             <Button
               variant="outline"
@@ -641,9 +1062,7 @@ export function TestRunnerPage() {
               ) : (
                 <Copy className="mr-2 h-4 w-4" />
               )}
-              {copiedCli
-                ? t('runner.copied')
-                : t('runner.copyCli')}
+              {copiedCli ? 'Copiado' : 'Copiar CLI corto'}
             </Button>
           </div>
         </CardContent>
@@ -699,15 +1118,15 @@ export function TestRunnerPage() {
             </button>
           </div>
 
-          {/* Command block */}
+          {/* Command block — reactive: reflects current run options */}
           <div className="rounded-md bg-[#1e1b4b] p-4">
             <div className="flex items-start justify-between gap-4">
               <code className="text-sm text-green-300 font-mono break-all whitespace-pre-wrap leading-relaxed">
-                $ {activeTab === 'mac' ? MAC_COMMAND : WINDOWS_COMMAND}
+                $ {activeCommand}
               </code>
               <button
                 type="button"
-                onClick={() => handleCopyHowTo(activeTab === 'mac' ? MAC_COMMAND : WINDOWS_COMMAND)}
+                onClick={() => handleCopyHowTo(activeCommand)}
                 className="shrink-0 rounded p-2 text-purple-300 hover:bg-white/10 transition-colors"
                 title={t('runner.copyCli')}
               >
@@ -718,6 +1137,9 @@ export function TestRunnerPage() {
                 )}
               </button>
             </div>
+            <p className="mt-2 text-[11px] text-purple-300/70">
+              💡 Este comando refleja tus opciones de arriba. Al cambiar una opción, el comando se actualiza automáticamente.
+            </p>
           </div>
         </CardContent>
       </Card>
