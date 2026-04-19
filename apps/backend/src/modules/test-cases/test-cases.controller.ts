@@ -8,6 +8,8 @@ import {
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { TestCasesService } from './test-cases.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
@@ -58,6 +60,7 @@ export class TestCasesController {
   }
 
   @Delete('test-cases/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {
     return this.testCasesService.remove(id);
   }

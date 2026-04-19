@@ -64,8 +64,11 @@ export function useUpdateTestCase() {
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateTestCaseDto }) =>
       api.patch<TestCase>(`/test-cases/${id}`, dto),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['test-cases'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'test-cases',
+      });
+    },
   });
 }
 
@@ -73,8 +76,12 @@ export function useDeleteTestCase() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/test-cases/${id}`),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['test-cases'] }),
+    onSuccess: async () => {
+      // Invalidate all test-cases queries (any projectId, any filter combo)
+      await queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'test-cases',
+      });
+    },
   });
 }
 
@@ -83,9 +90,15 @@ export function useDeleteTestSuite(projectId: string) {
   return useMutation({
     mutationFn: (suiteId: string) =>
       api.delete(`/projects/${projectId}/test-suites/${suiteId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['test-suites', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          predicate: (q) => q.queryKey[0] === 'test-suites',
+        }),
+        queryClient.invalidateQueries({
+          predicate: (q) => q.queryKey[0] === 'test-cases',
+        }),
+      ]);
     },
   });
 }

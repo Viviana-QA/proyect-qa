@@ -26,8 +26,15 @@ async function request<T>(
     throw new Error(error.message || `Request failed: ${response.status}`);
   }
 
+  // Handle empty-body success responses (204, or 200 with no body — common for DELETE)
   if (response.status === 204) return undefined as T;
-  return response.json();
+  const text = await response.text();
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as T;
+  }
 }
 
 export const api = {
