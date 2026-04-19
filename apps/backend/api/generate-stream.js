@@ -235,15 +235,36 @@ RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after)
     // Parse result
     res.write('event: status\ndata: ' + JSON.stringify({ step: 'parsing', message: 'Parsing...' }) + '\n\n');
 
+    // Robust JSON parse with repair pass for common LLM escape mistakes
+    // (e.g. emitting /\s/ instead of /\\s/ inside string values for regex).
+    const repairJson = (raw) => {
+      let s = raw.trim();
+      s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+      const firstBrace = s.indexOf('{');
+      const lastBrace = s.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        s = s.substring(firstBrace, lastBrace + 1);
+      }
+      s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
+      s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      return s;
+    };
+
     let mods = [];
+    let parsed = null;
     try {
-      let c = full.trim();
-      if (c.startsWith('```json')) c = c.substring(7);
-      if (c.startsWith('```')) c = c.substring(3);
-      if (c.endsWith('```')) c = c.substring(0, c.length - 3);
-      const parsed = JSON.parse(c.trim());
-      mods = Array.isArray(parsed) ? parsed : (parsed.modules || [parsed]);
+      parsed = JSON.parse(repairJson(full));
     } catch {
+      try {
+        parsed = JSON.parse(repairJson(full).replace(/,(\s*[}\]])/g, '$1'));
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (parsed) {
+      mods = Array.isArray(parsed) ? parsed : (parsed.modules || [parsed]);
+    } else {
       mods = [{ name: 'Generated Tests', description: 'AI tests', test_cases: [{ title: 'Generated Suite', description: '', test_type: 'e2e', priority: 'medium', code: full, tags: [] }] }];
     }
 

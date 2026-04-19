@@ -262,15 +262,55 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
     // Parse structure
     send('status', { step: 'parsing', message: 'Finalizando estructura...' });
 
+    /**
+     * LLMs frequently emit raw backslashes inside JSON string values
+     * (e.g. regex like /log\s*in/i), which violates JSON escape rules.
+     * This repairs those cases by doubling any \ not followed by a
+     * JSON-valid escape char ("\/bfnrtu]).
+     *
+     * Also handles:
+     *  - Stripping control chars from strings (which some LLMs emit)
+     *  - Extracting the JSON object/array even when wrapped in prose
+     */
+    const repairJson = (raw) => {
+      let s = raw.trim();
+      // Strip markdown code fences
+      s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+      // Extract from { ... } if there's prose around it
+      const firstBrace = s.indexOf('{');
+      const lastBrace = s.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        s = s.substring(firstBrace, lastBrace + 1);
+      }
+      // Repair: escape lone backslashes (\s, \d, \w, \[, \., etc. → \\s, \\d, ...)
+      s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
+      // Strip raw control characters (except \n, \r, \t which are valid escapes inside strings)
+      // LLMs sometimes emit literal control chars that break JSON.
+      s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      return s;
+    };
+
     let structure = null;
+    let parseError = null;
     try {
-      let c = full.trim();
-      if (c.startsWith('```json')) c = c.substring(7);
-      if (c.startsWith('```')) c = c.substring(3);
-      if (c.endsWith('```')) c = c.substring(0, c.length - 3);
-      structure = JSON.parse(c.trim());
-    } catch (e) {
-      send('error', { message: 'No se pudo parsear la estructura: ' + e.message, raw: full.substring(0, 500) });
+      structure = JSON.parse(repairJson(full));
+    } catch (e1) {
+      parseError = e1;
+      // Last-resort: try very aggressive trailing-comma removal
+      try {
+        const s = repairJson(full).replace(/,(\s*[}\]])/g, '$1');
+        structure = JSON.parse(s);
+        parseError = null;
+      } catch (e2) {
+        parseError = e2;
+      }
+    }
+
+    if (!structure) {
+      send('error', {
+        message: 'No se pudo parsear la estructura: ' + (parseError ? parseError.message : 'unknown'),
+        raw: full.substring(0, 500),
+      });
       res.end();
       return;
     }
