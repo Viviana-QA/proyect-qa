@@ -313,7 +313,10 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+        // Bumped from 8192 — regression suites with many modules/flows can
+        // exceed 8k tokens and get truncated mid-JSON. 24k gives comfortable
+        // headroom while staying within flash-lite limits.
+        generationConfig: { temperature: 0.2, maxOutputTokens: 24576 },
       }),
     });
 
@@ -352,53 +355,10 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
     // Parse structure
     send('status', { step: 'parsing', message: 'Finalizando estructura...' });
 
-    /**
-     * LLMs frequently emit raw backslashes inside JSON string values
-     * (e.g. regex like /log\s*in/i), which violates JSON escape rules.
-     * This repairs those cases by doubling any \ not followed by a
-     * JSON-valid escape char ("\/bfnrtu]).
-     *
-     * Also handles:
-     *  - Stripping control chars from strings (which some LLMs emit)
-     *  - Extracting the JSON object/array even when wrapped in prose
-     */
-    const repairJson = (raw) => {
-      let s = raw.trim();
-      // Strip markdown code fences
-      s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-      // Extract from { ... } if there's prose around it
-      const firstBrace = s.indexOf('{');
-      const lastBrace = s.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        s = s.substring(firstBrace, lastBrace + 1);
-      }
-      // Repair: escape lone backslashes (\s, \d, \w, \[, \., etc. → \\s, \\d, ...)
-      s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
-      // Strip raw control characters (except \n, \r, \t which are valid escapes inside strings)
-      // LLMs sometimes emit literal control chars that break JSON.
-      s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
-      return s;
-    };
-
-    let structure = null;
-    let parseError = null;
-    try {
-      structure = JSON.parse(repairJson(full));
-    } catch (e1) {
-      parseError = e1;
-      // Last-resort: try very aggressive trailing-comma removal
-      try {
-        const s = repairJson(full).replace(/,(\s*[}\]])/g, '$1');
-        structure = JSON.parse(s);
-        parseError = null;
-      } catch (e2) {
-        parseError = e2;
-      }
-    }
-
+    const structure = parseLLMJson(full);
     if (!structure) {
       send('error', {
-        message: 'No se pudo parsear la estructura: ' + (parseError ? parseError.message : 'unknown'),
+        message: 'No se pudo parsear la estructura del JSON generado por la IA (respuesta muy larga o mal formada). Intenta con menos URLs adicionales.',
         raw: full.substring(0, 500),
       });
       res.end();
@@ -424,6 +384,177 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
     }
   }
 };
+
+/* ------------------------------------------------------------------ */
+/*  Resilient LLM-JSON parser                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Attempts to parse a JSON payload emitted by an LLM, applying a series
+ * of repair passes. Each LLM quirk is handled independently so a single
+ * mistake doesn't prevent extraction of an otherwise-valid structure.
+ *
+ * Repairs (in order):
+ *   1. Strip markdown code fences (```json ... ```)
+ *   2. Extract only the {...} block if prose wraps it
+ *   3. Escape literal newlines/tabs/CRs INSIDE string values (state machine)
+ *   4. Double any lone \X escape that isn't JSON-valid (\s, \d, \[, etc.)
+ *   5. Remove control characters outside strings
+ *   6. Remove trailing commas before } or ]
+ *   7. If response was truncated mid-object, auto-close open brackets
+ *
+ * Returns the parsed object or null if all attempts fail.
+ */
+function parseLLMJson(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+
+  // ── Step 1-2: strip fences, extract brace block ──
+  let s = raw.trim();
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  const firstBrace = s.indexOf('{');
+  const lastBrace = s.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    s = s.substring(firstBrace, lastBrace + 1);
+  } else if (firstBrace >= 0) {
+    // Truncated response — take from first { and we'll auto-close later
+    s = s.substring(firstBrace);
+  }
+
+  // ── Step 3: escape newlines/tabs/CRs INSIDE string values ──
+  // Walks character-by-character tracking whether we're in a string literal.
+  // Literal newlines inside strings are invalid JSON — they must be \n.
+  s = escapeNewlinesInStrings(s);
+
+  // ── Step 4-5: backslash + control-char repair ──
+  s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
+  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+
+  // Try parsing now
+  const attempts = [
+    (x) => x,                                  // repaired as-is
+    (x) => x.replace(/,(\s*[}\]])/g, '$1'),    // strip trailing commas
+    (x) => closeTruncatedJson(x),              // close unclosed brackets
+    (x) => closeTruncatedJson(x.replace(/,(\s*[}\]])/g, '$1')),
+  ];
+  for (const fix of attempts) {
+    try {
+      return JSON.parse(fix(s));
+    } catch (_e) {
+      // try next repair
+    }
+  }
+  return null;
+}
+
+/**
+ * State-machine that walks a JSON string and escapes literal \n, \r, \t
+ * when they appear INSIDE a JSON string literal (between unescaped quotes).
+ * Leaves whitespace outside strings untouched (so formatting still works).
+ */
+function escapeNewlinesInStrings(s) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escaped) {
+      out += c;
+      escaped = false;
+      continue;
+    }
+    if (c === '\\' && inString) {
+      out += c;
+      escaped = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      out += c;
+      continue;
+    }
+    if (inString) {
+      if (c === '\n') { out += '\\n'; continue; }
+      if (c === '\r') { out += '\\r'; continue; }
+      if (c === '\t') { out += '\\t'; continue; }
+    }
+    out += c;
+  }
+  return out;
+}
+
+/**
+ * Repairs a JSON string that was truncated mid-structure (e.g. LLM hit
+ * maxOutputTokens and stopped in the middle of an array). Closes any
+ * unclosed strings, arrays, and objects in the correct nesting order.
+ *
+ * Also trims any partial value at the end (e.g. a half-written "code":
+ * field) so the closing is clean.
+ */
+function closeTruncatedJson(s) {
+  // Walk the whole string, tracking (a) current nesting stack,
+  // (b) string state, (c) position of the last safe cut — a comma
+  // at any depth that's OUTSIDE a string.
+  const openers = [];
+  let inString = false;
+  let escaped = false;
+  let lastSafeComma = -1;
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escaped) { escaped = false; continue; }
+    if (inString) {
+      if (c === '\\') { escaped = true; continue; }
+      if (c === '"') { inString = false; }
+      continue;
+    }
+    if (c === '"') { inString = true; continue; }
+    if (c === '{' || c === '[') { openers.push(c); continue; }
+    if (c === '}' || c === ']') { openers.pop(); continue; }
+    if (c === ',') lastSafeComma = i;
+  }
+
+  // Already complete — nothing to repair
+  if (!inString && openers.length === 0) return s;
+
+  // Truncate at the last safe comma if available — drops any partial
+  // element mid-way. Otherwise keep as much as we can and try to close.
+  let out;
+  if (lastSafeComma > 0) {
+    out = s.substring(0, lastSafeComma); // note: drop the trailing comma itself
+  } else {
+    out = s;
+    if (inString) out += '"'; // close dangling string
+  }
+
+  // Rebuild nesting stack for the truncated slice
+  const stack2 = [];
+  let inStr2 = false;
+  let esc2 = false;
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i];
+    if (esc2) { esc2 = false; continue; }
+    if (inStr2) {
+      if (c === '\\') { esc2 = true; continue; }
+      if (c === '"') { inStr2 = false; }
+      continue;
+    }
+    if (c === '"') { inStr2 = true; continue; }
+    if (c === '{' || c === '[') { stack2.push(c); continue; }
+    if (c === '}' || c === ']') { stack2.pop(); }
+  }
+  if (inStr2) out += '"';
+
+  // Clean up any trailing syntax fragments that remain
+  out = out.replace(/[,:]\s*$/, ''); // drop trailing , or :
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+
+  // Close every remaining opener in reverse
+  while (stack2.length > 0) {
+    const top = stack2.pop();
+    out += top === '{' ? '}' : ']';
+  }
+  return out;
+}
 
 /* ------------------------------------------------------------------ */
 /*  GitHub repo analyzer                                              */

@@ -196,7 +196,7 @@ RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 24576 },
       }),
     });
 
@@ -235,33 +235,12 @@ RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after)
     // Parse result
     res.write('event: status\ndata: ' + JSON.stringify({ step: 'parsing', message: 'Parsing...' }) + '\n\n');
 
-    // Robust JSON parse with repair pass for common LLM escape mistakes
-    // (e.g. emitting /\s/ instead of /\\s/ inside string values for regex).
-    const repairJson = (raw) => {
-      let s = raw.trim();
-      s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-      const firstBrace = s.indexOf('{');
-      const lastBrace = s.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        s = s.substring(firstBrace, lastBrace + 1);
-      }
-      s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
-      s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
-      return s;
-    };
-
+    // Resilient LLM-JSON parser (state-machine based).
+    // Handles: markdown fences, prose wrappers, literal newlines inside
+    // strings, bad backslash escapes (\s, \d, etc.), control chars,
+    // trailing commas, AND truncation by auto-closing unclosed brackets.
+    const parsed = parseLLMJson(full);
     let mods = [];
-    let parsed = null;
-    try {
-      parsed = JSON.parse(repairJson(full));
-    } catch {
-      try {
-        parsed = JSON.parse(repairJson(full).replace(/,(\s*[}\]])/g, '$1'));
-      } catch {
-        parsed = null;
-      }
-    }
-
     if (parsed) {
       mods = Array.isArray(parsed) ? parsed : (parsed.modules || [parsed]);
     } else {
@@ -373,3 +352,98 @@ RETURN ONLY valid JSON (no markdown fences, no explanatory text before or after)
     }
   }
 };
+
+/* ------------------------------------------------------------------ */
+/*  Resilient LLM-JSON parser (same implementation as explore-stream) */
+/* ------------------------------------------------------------------ */
+
+function parseLLMJson(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  let s = raw.trim();
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  const firstBrace = s.indexOf('{');
+  const lastBrace = s.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    s = s.substring(firstBrace, lastBrace + 1);
+  } else if (firstBrace >= 0) {
+    s = s.substring(firstBrace);
+  }
+  s = escapeNewlinesInStrings(s);
+  s = s.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\');
+  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+
+  const attempts = [
+    (x) => x,
+    (x) => x.replace(/,(\s*[}\]])/g, '$1'),
+    (x) => closeTruncatedJson(x),
+    (x) => closeTruncatedJson(x.replace(/,(\s*[}\]])/g, '$1')),
+  ];
+  for (const fix of attempts) {
+    try { return JSON.parse(fix(s)); } catch { /* try next */ }
+  }
+  return null;
+}
+
+function escapeNewlinesInStrings(s) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escaped) { out += c; escaped = false; continue; }
+    if (c === '\\' && inString) { out += c; escaped = true; continue; }
+    if (c === '"') { inString = !inString; out += c; continue; }
+    if (inString) {
+      if (c === '\n') { out += '\\n'; continue; }
+      if (c === '\r') { out += '\\r'; continue; }
+      if (c === '\t') { out += '\\t'; continue; }
+    }
+    out += c;
+  }
+  return out;
+}
+
+function closeTruncatedJson(s) {
+  const openers = [];
+  let inString = false;
+  let escaped = false;
+  let lastSafeComma = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escaped) { escaped = false; continue; }
+    if (inString) {
+      if (c === '\\') { escaped = true; continue; }
+      if (c === '"') { inString = false; }
+      continue;
+    }
+    if (c === '"') { inString = true; continue; }
+    if (c === '{' || c === '[') { openers.push(c); continue; }
+    if (c === '}' || c === ']') { openers.pop(); continue; }
+    if (c === ',') lastSafeComma = i;
+  }
+  if (!inString && openers.length === 0) return s;
+  let out;
+  if (lastSafeComma > 0) out = s.substring(0, lastSafeComma);
+  else { out = s; if (inString) out += '"'; }
+  const stack2 = [];
+  let inStr2 = false, esc2 = false;
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i];
+    if (esc2) { esc2 = false; continue; }
+    if (inStr2) {
+      if (c === '\\') { esc2 = true; continue; }
+      if (c === '"') inStr2 = false;
+      continue;
+    }
+    if (c === '"') { inStr2 = true; continue; }
+    if (c === '{' || c === '[') { stack2.push(c); continue; }
+    if (c === '}' || c === ']') stack2.pop();
+  }
+  if (inStr2) out += '"';
+  out = out.replace(/[,:]\s*$/, '').replace(/,(\s*[}\]])/g, '$1');
+  while (stack2.length > 0) {
+    const top = stack2.pop();
+    out += top === '{' ? '}' : ']';
+  }
+  return out;
+}
