@@ -122,6 +122,10 @@ export function GenerateTestsPage() {
   // User-configurable exploration options
   const [additionalUrlsText, setAdditionalUrlsText] = useState('');
   const [requiresAuth, setRequiresAuth] = useState(false);
+  // Git repo analysis — ground-truth module list from source code
+  const [repoUrl, setRepoUrl] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [showTokenField, setShowTokenField] = useState(false);
 
   // Selection state: flow IDs user wants to generate + per-flow assertion picks
   const [selectedFlows, setSelectedFlows] = useState<Set<string>>(new Set());
@@ -187,11 +191,12 @@ export function GenerateTestsPage() {
           max_pages: 12,
           additional_urls: additionalUrls,
           requires_auth: requiresAuth || Boolean(project.auth_config?.login_url),
+          repo_url: repoUrl.trim() || undefined,
+          github_token: githubToken.trim() || undefined,
           business_context: {
             industry: project.industry,
             target_audience: project.target_audience,
             key_flows: project.key_flows,
-            // Include auth metadata so the AI knows what's behind login
             requires_login: Boolean(project.auth_config?.login_url),
             login_url: project.auth_config?.login_url,
           },
@@ -239,7 +244,7 @@ export function GenerateTestsPage() {
         setExploreError(err.message);
       }
     }
-  }, [project, i18n.language, additionalUrlsText, requiresAuth]);
+  }, [project, i18n.language, additionalUrlsText, requiresAuth, repoUrl, githubToken]);
 
   const handleExploreEvent = (event: string, data: any) => {
     switch (event) {
@@ -694,6 +699,78 @@ export function GenerateTestsPage() {
                         <p className="text-xs text-[#1e1b4b]">{project.key_flows}</p>
                       </div>
                     )}
+
+                    {/* Git repo — ground-truth module discovery */}
+                    <div className="rounded-md border-2 border-dashed border-[#10b981]/40 bg-green-50/40 p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#10b981]/20">
+                          <svg className="h-3 w-3 fill-[#10b981]" viewBox="0 0 16 16">
+                            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-[#1e1b4b]">
+                            Repositorio Git (MUY RECOMENDADO)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Los archivos de routing del código fuente definen <strong>todos</strong> los
+                            módulos del sitio — incluso los que están detrás del login. Esto da cobertura
+                            completa sin necesitar crawler.
+                          </p>
+                        </div>
+                      </div>
+
+                      <input
+                        type="url"
+                        value={repoUrl}
+                        onChange={(e) => setRepoUrl(e.target.value)}
+                        placeholder="https://github.com/usuario/repositorio"
+                        className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#10b981]/30 focus:border-[#10b981]"
+                      />
+
+                      {!showTokenField && repoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setShowTokenField(true)}
+                          className="text-xs font-medium text-[#10b981] hover:underline"
+                        >
+                          ¿Es un repo privado? Agrega un token
+                        </button>
+                      )}
+
+                      {(showTokenField || githubToken) && (
+                        <div>
+                          <input
+                            type="password"
+                            value={githubToken}
+                            onChange={(e) => setGithubToken(e.target.value)}
+                            placeholder="ghp_xxxxxxxxxxxx (token con permiso 'repo')"
+                            className="w-full rounded-md border border-input bg-white px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-[#10b981]/30 focus:border-[#10b981]"
+                          />
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            El token no se guarda — solo se usa para esta exploración. Genéralo en{' '}
+                            <a
+                              href="https://github.com/settings/tokens/new?scopes=repo&description=QA%20Platform%20Explorer"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#7c3aed] hover:underline"
+                            >
+                              github.com/settings/tokens
+                            </a>{' '}
+                            con scope <code className="rounded bg-muted px-1">repo</code> (o{' '}
+                            <code className="rounded bg-muted px-1">public_repo</code> si es público).
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="rounded-md bg-white p-2 text-[11px] text-muted-foreground">
+                        💡 La IA leerá archivos como <code className="font-mono text-[#7c3aed]">router.tsx</code>,{' '}
+                        <code className="font-mono text-[#7c3aed]">pages/</code>,{' '}
+                        <code className="font-mono text-[#7c3aed]">app/</code>,{' '}
+                        <code className="font-mono text-[#7c3aed]">routes.ts</code>, y servicios para mapear la arquitectura completa.
+                        Soporta React, Vue, Next.js, Nuxt, SvelteKit, Remix y Angular.
+                      </div>
+                    </div>
 
                     <Button
                       onClick={handleExplore}

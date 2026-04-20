@@ -38,12 +38,14 @@ module.exports = async function handler(req, res) {
     const biz = body.business_context;
     const language = body.language || 'en';
     const max_pages = Math.min(parseInt(body.max_pages || '12', 10), 20);
-    // URLs explicitly provided by the user — guaranteed to be crawled in
-    // addition to anything we auto-discover from the home page.
     const additional_urls = Array.isArray(body.additional_urls) ? body.additional_urls : [];
-    // Auth-protected site hint — tells the AI that many pages won't be
-    // scrape-visible so it should propose flows based on key_flows too.
     const requires_auth = Boolean(body.requires_auth);
+    // GitHub repo URL + optional personal access token for private repos.
+    // The backend reads router/page/service files via GitHub API — this gives
+    // the AI access to the COMPLETE module structure, even areas behind login
+    // that no crawler could see.
+    const repo_url = (body.repo_url || '').trim();
+    const github_token = (body.github_token || '').trim();
 
     // Set up SSE early so events can flow
     res.setHeader('Content-Type', 'text/event-stream');
@@ -171,6 +173,26 @@ module.exports = async function handler(req, res) {
     send('status', { step: 'pages_scraped', count: pages.length, message: pages.length + ' páginas analizadas' });
 
     // ───────────────────────────────────────────────────────────────
+    // Step 3.5: If a GitHub repo URL was provided, pull router + key
+    // files. This gives the AI 100% module visibility, even for areas
+    // behind login that no crawler could see.
+    // ───────────────────────────────────────────────────────────────
+    let repoAnalysis = '';
+    if (repo_url) {
+      send('status', { step: 'analyzing_repo', message: 'Analizando repositorio Git...' });
+      try {
+        repoAnalysis = await analyzeGitRepo(repo_url, github_token, send);
+        send('status', {
+          step: 'repo_done',
+          message: 'Repo analizado: ' + repoAnalysis.split('=== FILE:').length + ' archivos relevantes',
+        });
+      } catch (e) {
+        send('status', { step: 'repo_failed', message: 'Repo: ' + e.message });
+        // non-fatal — continue with just page content
+      }
+    }
+
+    // ───────────────────────────────────────────────────────────────
     // Step 4: Send combined content to Gemini for structure analysis
     // ───────────────────────────────────────────────────────────────
     send('status', { step: 'analyzing', message: 'IA analizando estructura del sitio...' });
@@ -178,9 +200,15 @@ module.exports = async function handler(req, res) {
     const langName = language === 'es' ? 'Spanish' : 'English';
     const ctx = biz ? '\nBusiness context (VERY IMPORTANT — use to expand coverage beyond what is visible): ' + JSON.stringify(biz) : '';
 
-    const combinedContent = pages
+    let combinedContent = pages
       .map((p, i) => '=== PAGE ' + (i + 1) + ': ' + p.url + ' ===\n' + p.content)
       .join('\n\n');
+
+    // Prepend repo analysis so the AI sees module structure from source code
+    // BEFORE the scraped HTML. Router files define the complete app topology.
+    if (repoAnalysis) {
+      combinedContent = repoAnalysis + '\n\n' + combinedContent;
+    }
 
     const authHint = requires_auth
       ? '\n\n⚠️ AUTH-PROTECTED SITE: Most pages require login and are NOT visible in the scraped content above. You can ONLY see the public pages (landing, login, signup). However, the user already provided the expected functionality in business_context.key_flows. For those auth-protected flows:\n' +
@@ -203,13 +231,20 @@ CODE LANGUAGE: Playwright API calls always in English.
 TASK — BUILD A COMPREHENSIVE REGRESSION SUITE:
 This is a REGRESSION test suite, meaning full coverage is the goal — not just happy paths.
 
-1. Identify 4-10 LOGICAL MODULES. Combine aggressively:
-   - What you DIRECTLY OBSERVE in the scraped pages
-   - EVERY item mentioned in business_context.key_flows is its OWN MODULE, even if not
-     visible in the crawler's output. If key_flows says "registro, login, creacion de perfil
-     buyer y seller, creacion de producto, compra", that's 5 modules minimum.
-   - Common SaaS patterns implied by industry: if it's an e-commerce/marketplace, expect
-     Catalog, Cart, Checkout, Orders, Account, Profile, Search, Filters, Notifications.
+1. Identify 4-20 LOGICAL MODULES. Combine aggressively from MULTIPLE sources:
+   - **GIT REPO FILES (HIGHEST PRIORITY when present)**: Router files, pages/, app/, and
+     routes/ directories define the COMPLETE app topology. EVERY route is a module or
+     feature. Parse React Router <Route>, Vue Router routes, Next.js pages, SvelteKit
+     routes, etc. If you see "/dashboard/catalogue/:id", create a Catalog module with
+     a "View product detail" flow. If you see "src/services/orders.service.ts", there's
+     an Orders module.
+   - What you DIRECTLY OBSERVE in the scraped HTML pages
+   - EVERY item in business_context.key_flows is a MODULE (even if not observed)
+   - Common SaaS patterns: Catalog, Cart, Checkout, Orders, Account, Profile, Search,
+     Filters, Notifications, Settings, Admin Panel, Analytics, Billing, Invoices
+
+   The repo source code is the GROUND TRUTH for what modules exist. Trust it above the
+   crawler output.
 
 2. For each module, list URLs. If auth-protected and not observed, leave urls as [] and set
    entry_url per flow to base_url (the tests will start at login and navigate after).
@@ -389,3 +424,138 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
     }
   }
 };
+
+/* ------------------------------------------------------------------ */
+/*  GitHub repo analyzer                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fetches router / page / service files from a GitHub repo via the
+ * REST API + raw.githubusercontent.com. Returns concatenated content
+ * that the AI can use to build a full module map.
+ *
+ * Supports both public and private repos (with user-provided PAT).
+ *
+ * File patterns detected across popular frameworks:
+ *   • React Router:  src/router*, src/routes*, src/App.*
+ *   • Next.js:       pages/**, app/**  (both pages dir and app dir)
+ *   • Vue Router:    src/router/index.*, src/routes.*
+ *   • Angular:       **\/app-routing.module.ts, **\/routes.ts
+ *   • Nuxt:          pages/**
+ *   • Remix:         app/routes/**
+ *   • SvelteKit:     src/routes/**
+ *   • Also pulls:    package.json, README.md, top-level services / api
+ */
+async function analyzeGitRepo(repoUrl, token, send) {
+  // Parse GitHub URL — accepts various forms
+  const m = repoUrl.match(/github\.com[/:]([^/]+)\/([^/\s]+?)(?:\.git|\/|$)/i);
+  if (!m) throw new Error('URL no parece un repositorio de GitHub');
+  const owner = m[1];
+  const repo = m[2];
+
+  const headers = { Accept: 'application/vnd.github.v3+json' };
+  if (token) headers.Authorization = 'token ' + token;
+
+  // 1) Get default branch
+  const metaRes = await fetch(
+    'https://api.github.com/repos/' + owner + '/' + repo,
+    { headers, signal: AbortSignal.timeout(10000) },
+  );
+  if (metaRes.status === 404) {
+    throw new Error('Repo no encontrado (404). Si es privado, incluye un token.');
+  }
+  if (metaRes.status === 401 || metaRes.status === 403) {
+    throw new Error('Acceso denegado (' + metaRes.status + '). Token inválido o sin permisos.');
+  }
+  if (!metaRes.ok) throw new Error('GitHub ' + metaRes.status);
+  const meta = await metaRes.json();
+  const branch = meta.default_branch;
+
+  if (send) send('repo_meta', { owner, repo, branch, description: meta.description, language: meta.language });
+
+  // 2) Get full file tree (recursive)
+  const treeRes = await fetch(
+    'https://api.github.com/repos/' + owner + '/' + repo + '/git/trees/' + branch + '?recursive=1',
+    { headers, signal: AbortSignal.timeout(15000) },
+  );
+  if (!treeRes.ok) throw new Error('No se pudo leer el árbol del repo: ' + treeRes.status);
+  const treeData = await treeRes.json();
+  const tree = Array.isArray(treeData.tree) ? treeData.tree : [];
+
+  // 3) Filter to files likely to define modules/routes
+  const RELEVANT = [
+    // React / Vue / general
+    /(^|\/)(router|routes)\.(ts|tsx|js|jsx)$/i,
+    /(^|\/)router\/index\.(ts|tsx|js|jsx)$/i,
+    /^(src\/)?App\.(ts|tsx|js|jsx|vue)$/i,
+    /^(src\/)?main\.(ts|tsx|js|jsx)$/i,
+    // Next.js — pages dir
+    /^pages\/[^/]+\.(ts|tsx|js|jsx|mdx)$/,
+    /^pages\/[^/]+\/index\.(ts|tsx|js|jsx)$/,
+    /^src\/pages\/[^/]+\.(ts|tsx|js|jsx)$/,
+    // Next.js 13+ app dir
+    /^app\/.*\/page\.(ts|tsx|js|jsx)$/,
+    /^src\/app\/.*\/page\.(ts|tsx|js|jsx)$/,
+    // Nuxt / SvelteKit / Remix
+    /^src\/routes\/.+\.(ts|tsx|js|jsx|svelte|vue)$/i,
+    /^app\/routes\/.+\.(ts|tsx|js|jsx)$/,
+    // Angular
+    /app-routing\.module\.ts$/i,
+    // Services / API layers
+    /^src\/services\//,
+    /^src\/api\//,
+    /^app\/api\//,
+    // Root meta
+    /^package\.json$/,
+    /^README\.md$/i,
+  ];
+
+  const interesting = tree
+    .filter((f) => f && f.type === 'blob' && f.path && (!f.size || f.size < 80000))
+    .filter((f) => RELEVANT.some((rx) => rx.test(f.path)));
+
+  // Prioritize router files; cap at 25 files
+  interesting.sort((a, b) => {
+    const isRouterA = /router|routes|App\.|main\./i.test(a.path) ? 0 : 1;
+    const isRouterB = /router|routes|App\.|main\./i.test(b.path) ? 0 : 1;
+    return isRouterA - isRouterB;
+  });
+  const filesToFetch = interesting.slice(0, 25);
+
+  if (send) send('repo_files', { count: filesToFetch.length, files: filesToFetch.map((f) => f.path) });
+
+  // 4) Fetch contents of each relevant file (batched, parallel of 5)
+  let body = '=== GIT REPO: ' + owner + '/' + repo + ' (branch ' + branch + ') ===\n';
+  if (meta.description) body += 'Description: ' + meta.description + '\n';
+  if (meta.language) body += 'Primary language: ' + meta.language + '\n';
+  body += '\n';
+
+  const rawBase = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/';
+  const batchSize = 5;
+  for (let i = 0; i < filesToFetch.length; i += batchSize) {
+    const batch = filesToFetch.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (f) => {
+        try {
+          const rawHeaders = {};
+          if (token) rawHeaders.Authorization = 'token ' + token;
+          const r = await fetch(rawBase + f.path, {
+            headers: rawHeaders,
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!r.ok) return null;
+          const text = await r.text();
+          return { path: f.path, content: text.substring(0, 3000) };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const r of results) {
+      if (!r) continue;
+      body += '=== FILE: ' + r.path + ' ===\n' + r.content + '\n\n';
+      if (body.length > 50000) return body; // hard cap for Gemini context
+    }
+  }
+  return body;
+}
