@@ -200,20 +200,33 @@ ${combinedContent.substring(0, 30000)}${authHint}
 METADATA LANGUAGE: ${langName}. (titles, descriptions, assertion descriptions — all in ${langName})
 CODE LANGUAGE: Playwright API calls always in English.
 
-TASK:
-1. Identify 3-8 LOGICAL MODULES. Combine:
-   - What you DIRECTLY OBSERVE in the scraped pages (e.g. a login form → "Autenticación", a product list → "Catálogo")
-   - What business_context.key_flows suggests should exist (e.g. "checkout", "profile creation", "product listing" → create those modules even if not visible)
-   Every module must map to something concrete: either observed in content OR mentioned in key_flows.
+TASK — BUILD A COMPREHENSIVE REGRESSION SUITE:
+This is a REGRESSION test suite, meaning full coverage is the goal — not just happy paths.
 
-2. For each module, list URLs. If the module is auth-protected, mark urls as [] and set entry_url per flow to the login URL.
+1. Identify 4-10 LOGICAL MODULES. Combine aggressively:
+   - What you DIRECTLY OBSERVE in the scraped pages
+   - EVERY item mentioned in business_context.key_flows is its OWN MODULE, even if not
+     visible in the crawler's output. If key_flows says "registro, login, creacion de perfil
+     buyer y seller, creacion de producto, compra", that's 5 modules minimum.
+   - Common SaaS patterns implied by industry: if it's an e-commerce/marketplace, expect
+     Catalog, Cart, Checkout, Orders, Account, Profile, Search, Filters, Notifications.
 
-3. For each module, propose 2-5 USER FLOWS covering both happy paths AND edge cases (validation errors, empty states, invalid inputs).
+2. For each module, list URLs. If auth-protected and not observed, leave urls as [] and set
+   entry_url per flow to base_url (the tests will start at login and navigate after).
 
-4. For each flow, propose 2-4 SUGGESTED ASSERTIONS. Each assertion:
+3. For each module, propose 5-10 FLOWS covering REGRESSION CATEGORIES. Every module MUST have:
+   - 1-2 HAPPY PATH flows (normal successful usage)
+   - 2-3 VALIDATION flows (required fields empty, format wrong, too short/long, special chars)
+   - 1-2 EDGE CASES (boundary values, duplicate data, max limits)
+   - 1 ERROR STATE flow (server 500, network failure, 404)
+   - 1 EMPTY STATE flow when applicable (no data yet, empty list)
+   - 1-2 PERMISSION flows if roles are hinted (admin-only actions, guest view)
+
+4. For each flow, propose 3-5 SUGGESTED ASSERTIONS. Each assertion:
    - Has a short human description (${langName})
-   - Has a playwright code snippet using SELECTOR STRATEGY below
-   - Focuses on OBSERVABLE STATE (URL, visible elements, text content) rather than business logic the AI can't verify
+   - Uses playwright code per SELECTOR STRATEGY below
+   - Focuses on OBSERVABLE STATE (URL, visible elements, text content, counts)
+   - Prefer navigation + visibility asserts over text-equality asserts (more stable)
 
 SELECTOR STRATEGY (mandatory — tests must be site-agnostic):
   1. CSS semantic: input[type="email"], input[type="password"], button[type="submit"], form
