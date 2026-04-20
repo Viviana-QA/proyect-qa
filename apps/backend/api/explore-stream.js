@@ -360,7 +360,8 @@ RETURN ONLY valid JSON (no markdown fences, no prose):
     send('complete', {
       structure: structure,
       pages_scraped: pages.length,
-      urls_discovered: all.length,
+      urls_discovered: discovered.length,
+      urls_user_provided: userUrls.length,
     });
 
     res.end();
