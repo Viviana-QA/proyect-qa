@@ -37,7 +37,13 @@ module.exports = async function handler(req, res) {
     const project_name = body.project_name || '';
     const biz = body.business_context;
     const language = body.language || 'en';
-    const max_pages = Math.min(parseInt(body.max_pages || '8', 10), 12);
+    const max_pages = Math.min(parseInt(body.max_pages || '12', 10), 20);
+    // URLs explicitly provided by the user — guaranteed to be crawled in
+    // addition to anything we auto-discover from the home page.
+    const additional_urls = Array.isArray(body.additional_urls) ? body.additional_urls : [];
+    // Auth-protected site hint — tells the AI that many pages won't be
+    // scrape-visible so it should propose flows based on key_flows too.
+    const requires_auth = Boolean(body.requires_auth);
 
     // Set up SSE early so events can flow
     res.setHeader('Content-Type', 'text/event-stream');
@@ -99,17 +105,42 @@ module.exports = async function handler(req, res) {
     }
     urlSet.delete(baseUrlObj.origin + baseUrlObj.pathname); // don't re-scrape home
 
-    // Prioritize likely auth / signup / dashboard / checkout URLs (common flows)
-    const all = Array.from(urlSet);
-    const priorityKeywords = ['signin', 'signup', 'login', 'register', 'dashboard', 'checkout', 'cart', 'account', 'profile', 'settings'];
-    all.sort((a, b) => {
+    // Merge user-provided URLs with auto-discovered ones — user URLs go first
+    // so they're guaranteed to be crawled within the max_pages budget.
+    const discovered = Array.from(urlSet);
+    const priorityKeywords = ['signin', 'signup', 'login', 'register', 'dashboard', 'catalog', 'catalogue', 'product', 'checkout', 'cart', 'account', 'profile', 'settings', 'orders', 'quotes', 'requests', 'invoic'];
+    discovered.sort((a, b) => {
       const aScore = priorityKeywords.some((k) => a.toLowerCase().includes(k)) ? 0 : 1;
       const bScore = priorityKeywords.some((k) => b.toLowerCase().includes(k)) ? 0 : 1;
       return aScore - bScore;
     });
-    const toVisit = all.slice(0, max_pages - 1);
 
-    send('links_found', { total: all.length, to_visit: toVisit });
+    // Normalize user URLs so comparison is stable
+    const normalizeUrl = (u) => {
+      try {
+        const n = new URL(u, base_url);
+        return n.origin + n.pathname;
+      } catch { return null; }
+    };
+    const userUrls = additional_urls
+      .map(normalizeUrl)
+      .filter(Boolean)
+      .filter((u) => u !== baseUrlObj.origin + baseUrlObj.pathname);
+    // De-dup while preserving user-first order
+    const seen = new Set();
+    const ordered = [];
+    for (const u of [...userUrls, ...discovered]) {
+      if (seen.has(u)) continue;
+      seen.add(u);
+      ordered.push(u);
+    }
+    const toVisit = ordered.slice(0, max_pages - 1);
+
+    send('links_found', {
+      total: discovered.length,
+      user_provided: userUrls.length,
+      to_visit: toVisit,
+    });
 
     // ───────────────────────────────────────────────────────────────
     // Step 3: Scrape each discovered URL (with a concurrency cap)
@@ -145,33 +176,44 @@ module.exports = async function handler(req, res) {
     send('status', { step: 'analyzing', message: 'IA analizando estructura del sitio...' });
 
     const langName = language === 'es' ? 'Spanish' : 'English';
-    const ctx = biz ? '\nBusiness context: ' + JSON.stringify(biz) : '';
+    const ctx = biz ? '\nBusiness context (VERY IMPORTANT — use to expand coverage beyond what is visible): ' + JSON.stringify(biz) : '';
 
     const combinedContent = pages
       .map((p, i) => '=== PAGE ' + (i + 1) + ': ' + p.url + ' ===\n' + p.content)
       .join('\n\n');
 
+    const authHint = requires_auth
+      ? '\n\n⚠️ AUTH-PROTECTED SITE: Most pages require login and are NOT visible in the scraped content above. You can ONLY see the public pages (landing, login, signup). However, the user already provided the expected functionality in business_context.key_flows. For those auth-protected flows:\n' +
+        '  - Create modules for them based on key_flows (e.g. if key_flows mentions "checkout", create a Checkout module)\n' +
+        '  - For each flow, mark entry_url as the login URL, with a note in description that authentication is required first\n' +
+        '  - Use generic CSS selectors (input[type="..."], button[type="submit"]) since you cannot observe the exact labels\n' +
+        '  - Prefer navigation assertions (toHaveURL with regex) and structural assertions (toBeVisible on common selectors)\n'
+      : '';
+
     const prompt = `You are an expert QA architect. Analyze this multi-page website dump and produce a structured site map of modules, user flows, and suggested test assertions.
 
 Website: ${base_url} ${project_name ? '(' + project_name + ')' : ''}${ctx}
 
-${pages.length} PAGES SCRAPED:
-${combinedContent.substring(0, 30000)}
+${pages.length} PAGES SCRAPED (only public-facing pages visible to the crawler):
+${combinedContent.substring(0, 30000)}${authHint}
 
 METADATA LANGUAGE: ${langName}. (titles, descriptions, assertion descriptions — all in ${langName})
 CODE LANGUAGE: Playwright API calls always in English.
 
 TASK:
-1. Identify 2-6 LOGICAL MODULES based on what you actually see across the pages (e.g. "Autenticación", "Navegación", "Checkout"). Never invent modules for features not observable in the content.
+1. Identify 3-8 LOGICAL MODULES. Combine:
+   - What you DIRECTLY OBSERVE in the scraped pages (e.g. a login form → "Autenticación", a product list → "Catálogo")
+   - What business_context.key_flows suggests should exist (e.g. "checkout", "profile creation", "product listing" → create those modules even if not visible)
+   Every module must map to something concrete: either observed in content OR mentioned in key_flows.
 
-2. For each module, list the URLs you observed that belong to it.
+2. For each module, list URLs. If the module is auth-protected, mark urls as [] and set entry_url per flow to the login URL.
 
-3. For each module, propose 2-5 USER FLOWS. A flow is a specific user journey (e.g. "Login exitoso con credenciales válidas", "Validación de formato de email inválido"). Flows must be groundable in what you observed — never invent flows for features you didn't see.
+3. For each module, propose 2-5 USER FLOWS covering both happy paths AND edge cases (validation errors, empty states, invalid inputs).
 
 4. For each flow, propose 2-4 SUGGESTED ASSERTIONS. Each assertion:
    - Has a short human description (${langName})
    - Has a playwright code snippet using SELECTOR STRATEGY below
-   - Is verifiable from what's observable in the scraped pages
+   - Focuses on OBSERVABLE STATE (URL, visible elements, text content) rather than business logic the AI can't verify
 
 SELECTOR STRATEGY (mandatory — tests must be site-agnostic):
   1. CSS semantic: input[type="email"], input[type="password"], button[type="submit"], form

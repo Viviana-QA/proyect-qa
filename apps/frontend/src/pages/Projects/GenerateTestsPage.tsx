@@ -119,6 +119,9 @@ export function GenerateTestsPage() {
   });
   const [siteStructure, setSiteStructure] = useState<SiteStructure | null>(null);
   const [exploreError, setExploreError] = useState('');
+  // User-configurable exploration options
+  const [additionalUrlsText, setAdditionalUrlsText] = useState('');
+  const [requiresAuth, setRequiresAuth] = useState(false);
 
   // Selection state: flow IDs user wants to generate + per-flow assertion picks
   const [selectedFlows, setSelectedFlows] = useState<Set<string>>(new Set());
@@ -166,6 +169,11 @@ export function GenerateTestsPage() {
 
       const backendBase = API_URL.trim().replace(/\/+$/, '').replace(/\/api$/, '');
 
+      const additionalUrls = additionalUrlsText
+        .split(/[\n,]/)
+        .map((u) => u.trim())
+        .filter(Boolean);
+
       const response = await fetch(`${backendBase}/api/explore-stream`, {
         method: 'POST',
         headers: {
@@ -176,14 +184,17 @@ export function GenerateTestsPage() {
           base_url: project.base_url,
           project_name: project.name,
           language: i18n.language,
-          max_pages: 8,
-          business_context: project.industry
-            ? {
-                industry: project.industry,
-                target_audience: project.target_audience,
-                key_flows: project.key_flows,
-              }
-            : undefined,
+          max_pages: 12,
+          additional_urls: additionalUrls,
+          requires_auth: requiresAuth || Boolean(project.auth_config?.login_url),
+          business_context: {
+            industry: project.industry,
+            target_audience: project.target_audience,
+            key_flows: project.key_flows,
+            // Include auth metadata so the AI knows what's behind login
+            requires_login: Boolean(project.auth_config?.login_url),
+            login_url: project.auth_config?.login_url,
+          },
         }),
         signal: controller.signal,
       });
@@ -228,7 +239,7 @@ export function GenerateTestsPage() {
         setExploreError(err.message);
       }
     }
-  }, [project, i18n.language]);
+  }, [project, i18n.language, additionalUrlsText, requiresAuth]);
 
   const handleExploreEvent = (event: string, data: any) => {
     switch (event) {
@@ -619,10 +630,71 @@ export function GenerateTestsPage() {
                       Paso 1 de 2 — Explorar el sitio
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      La IA navegará hasta 8 páginas del sitio para mapear módulos y flujos. Toma ~30s.
+                      La IA navegará hasta 12 páginas del sitio para mapear módulos y flujos. Toma ~30s.
                     </p>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
+                    {/* Info panel about crawling limitations */}
+                    <div className="rounded-md border-l-4 border-[#f59e0b] bg-[#fffbeb] p-3 text-xs">
+                      <p className="font-semibold text-[#92400e]">⚠️ Límite del crawler público</p>
+                      <p className="mt-1 text-[#92400e]/90">
+                        El explorador solo puede ver páginas <strong>públicas</strong> (no inicia sesión).
+                        Si tu sitio tiene áreas protegidas con login, agrega URLs que conoces abajo y la
+                        IA las incluirá aunque no pueda leer el contenido — los tests se generarán con
+                        selectores genéricos que funcionen después del login.
+                      </p>
+                    </div>
+
+                    {/* Auth toggle */}
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={requiresAuth || Boolean(project.auth_config?.login_url)}
+                        disabled={Boolean(project.auth_config?.login_url)}
+                        onCheckedChange={(v) => setRequiresAuth(Boolean(v))}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-[#1e1b4b]">
+                          Este sitio requiere login para la mayoría de páginas
+                          {project.auth_config?.login_url && (
+                            <span className="ml-2 text-xs text-[#10b981]">(auto-detectado)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          La IA expandirá los módulos usando los flujos clave del proyecto, aunque no pueda
+                          ver las páginas internas.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Additional URLs input */}
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-[#1e1b4b]">
+                        URLs adicionales (opcional)
+                      </label>
+                      <textarea
+                        value={additionalUrlsText}
+                        onChange={(e) => setAdditionalUrlsText(e.target.value)}
+                        rows={3}
+                        placeholder="/dashboard/catalogue&#10;/dashboard/my-orders&#10;/dashboard/profile"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Una URL por línea (o separadas por comas). Pueden ser relativas o absolutas. La IA
+                        priorizará estas sobre las auto-descubiertas.
+                      </p>
+                    </div>
+
+                    {/* Business context summary */}
+                    {project.key_flows && (
+                      <div className="rounded-md bg-[#f5f3ff] p-3">
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#7c3aed]">
+                          Flujos clave del proyecto (se usarán para expandir módulos)
+                        </p>
+                        <p className="text-xs text-[#1e1b4b]">{project.key_flows}</p>
+                      </div>
+                    )}
+
                     <Button
                       onClick={handleExplore}
                       className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9]"
@@ -706,6 +778,34 @@ export function GenerateTestsPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Expand coverage — add more URLs and re-explore */}
+                  <details className="rounded-md border border-[#7c3aed]/20 bg-white">
+                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[#1e1b4b] hover:bg-[#f5f3ff]/40">
+                      ¿Faltan módulos? Agrega URLs específicas y explora de nuevo
+                    </summary>
+                    <div className="space-y-3 border-t border-[#7c3aed]/10 p-4">
+                      <textarea
+                        value={additionalUrlsText}
+                        onChange={(e) => setAdditionalUrlsText(e.target.value)}
+                        rows={4}
+                        placeholder="/dashboard/catalogue&#10;/dashboard/my-orders&#10;/dashboard/profile&#10;/checkout"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Las URLs que pegues aquí serán exploradas con prioridad. Útil para áreas
+                        tras login que el crawler no puede acceder automáticamente.
+                      </p>
+                      <Button
+                        onClick={handleExplore}
+                        size="sm"
+                        className="gap-1 bg-[#7c3aed] hover:bg-[#6d28d9]"
+                      >
+                        <Compass className="h-3 w-3" />
+                        Re-explorar con estas URLs
+                      </Button>
+                    </div>
+                  </details>
 
                   <Card>
                     <CardHeader>
