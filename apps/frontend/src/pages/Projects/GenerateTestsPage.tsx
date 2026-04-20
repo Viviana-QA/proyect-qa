@@ -136,6 +136,17 @@ export function GenerateTestsPage() {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
 
+  // Per-flow generation state — reactive UI: each flow tracks its own lifecycle
+  type FlowStatus = 'idle' | 'generating' | 'saving' | 'done' | 'failed';
+  const [flowStatus, setFlowStatus] = useState<Record<string, FlowStatus>>({});
+  const [flowError, setFlowError] = useState<Record<string, string>>({});
+  // Cache: module_name → DB module id. Prevents duplicate modules when
+  // multiple flows in the same module are generated separately.
+  const moduleIdCacheRef = useRef<Record<string, { moduleId: string; suiteId: string }>>({});
+  // Bulk generation control — user can abort the run-all loop
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const bulkAbortRef = useRef(false);
+
   // Auto-scroll the stream output
   useEffect(() => {
     if (streamRef.current) {
@@ -381,6 +392,219 @@ export function GenerateTestsPage() {
   }, [siteStructure, selectedFlows, selectedAssertions, customAssertions, project]);
 
   const selectedFlowCount = useMemo(() => buildFlowsPayload().length, [buildFlowsPayload]);
+
+  /* ============== PER-FLOW GENERATION (1:1 reactive) ============== */
+
+  /**
+   * Generate a single flow as one test case. Auto-saves to DB on success.
+   * Returns true on success, false on failure.
+   */
+  const generateOneFlow = useCallback(
+    async (flow: ExploredFlow, moduleName: string, moduleDescription: string): Promise<boolean> => {
+      if (!project) return false;
+
+      // Build the assertions list from user selection
+      const assertIds = selectedAssertions[flow.id] || new Set<string>();
+      const suggested = (flow.suggested_assertions || []).filter((a) => assertIds.has(a.id));
+      const custom = customAssertions[flow.id] || [];
+      const allAssertions = [
+        ...suggested.map((a) => ({ description: a.description, code: a.code })),
+        ...custom,
+      ];
+
+      if (allAssertions.length === 0) {
+        setFlowStatus((s) => ({ ...s, [flow.id]: 'failed' }));
+        setFlowError((e) => ({ ...e, [flow.id]: 'Sin asserciones seleccionadas' }));
+        return false;
+      }
+
+      setFlowStatus((s) => ({ ...s, [flow.id]: 'generating' }));
+      setFlowError((e) => ({ ...e, [flow.id]: '' }));
+
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session?.access_token;
+        if (!token) throw new Error('No autenticado');
+
+        const backendBase = API_URL.trim().replace(/\/+$/, '').replace(/\/api$/, '');
+
+        const response = await fetch(`${backendBase}/api/generate-stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            base_url: project.base_url,
+            project_name: project.name,
+            language: i18n.language,
+            test_types: ['e2e'],
+            selected_flows: [
+              {
+                id: flow.id,
+                module_name: moduleName,
+                name: flow.name,
+                description: flow.description,
+                priority: flow.priority || 'medium',
+                entry_url: flow.entry_url || project.base_url,
+                assertions: allAssertions,
+              },
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: response.statusText }));
+          throw new Error(err.error || `HTTP ${response.status}`);
+        }
+
+        // Stream and collect
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEvent = '';
+        let collectedModules: GeneratedModule[] = [];
+        let streamError = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.substring(7).trim();
+            } else if (line.startsWith('data: ') && currentEvent) {
+              try {
+                const data = JSON.parse(line.substring(6));
+                if (currentEvent === 'complete') {
+                  collectedModules = data.modules || [];
+                } else if (currentEvent === 'error') {
+                  streamError = data.message || 'Generación falló';
+                }
+              } catch {
+                /* skip */
+              }
+              currentEvent = '';
+            }
+          }
+        }
+
+        if (streamError) throw new Error(streamError);
+        if (collectedModules.length === 0) throw new Error('La IA no devolvió ningún test');
+
+        // Auto-save to DB
+        setFlowStatus((s) => ({ ...s, [flow.id]: 'saving' }));
+
+        for (const mod of collectedModules) {
+          const cacheKey = moduleName; // prefer the user-facing module name
+          let moduleRecord = moduleIdCacheRef.current[cacheKey];
+
+          if (!moduleRecord) {
+            // Create module
+            const modRes = await fetch(`${API_URL}/projects/${project.id}/modules`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                name: moduleName,
+                description: moduleDescription || mod.description || '',
+              }),
+            });
+            const savedMod = await modRes.json();
+
+            // Create one suite per module (all flows in this module go here)
+            const suiteRes = await fetch(`${API_URL}/projects/${project.id}/test-suites`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                name: moduleName,
+                description: moduleDescription || mod.description || '',
+                test_type: 'e2e',
+                module_id: savedMod.id,
+              }),
+            });
+            const suite = await suiteRes.json();
+
+            moduleRecord = { moduleId: savedMod.id, suiteId: suite.id };
+            moduleIdCacheRef.current[cacheKey] = moduleRecord;
+          }
+
+          // Create test cases for this flow
+          for (const tc of mod.test_cases || []) {
+            await fetch(`${API_URL}/projects/${project.id}/test-cases`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                suite_id: moduleRecord.suiteId,
+                title: tc.title,
+                description: tc.description,
+                test_type: tc.test_type || 'e2e',
+                playwright_code: tc.code,
+                tags: tc.tags || [],
+                priority: tc.priority || flow.priority || 'medium',
+              }),
+            });
+          }
+        }
+
+        setFlowStatus((s) => ({ ...s, [flow.id]: 'done' }));
+        return true;
+      } catch (err: any) {
+        setFlowStatus((s) => ({ ...s, [flow.id]: 'failed' }));
+        setFlowError((e) => ({ ...e, [flow.id]: err.message || 'Error desconocido' }));
+        return false;
+      }
+    },
+    [project, selectedAssertions, customAssertions, i18n.language],
+  );
+
+  /**
+   * Sequentially generate every selected flow that isn't yet 'done'.
+   * User can abort mid-run via the cancel button.
+   */
+  const generateAllPending = useCallback(async () => {
+    if (!siteStructure) return;
+    setIsBulkGenerating(true);
+    bulkAbortRef.current = false;
+
+    try {
+      for (const mod of siteStructure.modules) {
+        if (bulkAbortRef.current) break;
+        for (const f of mod.flows || []) {
+          if (bulkAbortRef.current) break;
+          if (!selectedFlows.has(f.id)) continue;
+          if (flowStatus[f.id] === 'done') continue;
+          // Await each flow sequentially so the UI updates visibly
+          await generateOneFlow(f, mod.name, mod.description || '');
+        }
+      }
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  }, [siteStructure, selectedFlows, flowStatus, generateOneFlow]);
+
+  const abortBulk = () => {
+    bulkAbortRef.current = true;
+  };
+
+  // Count flows by status for the summary UI
+  const flowCounts = useMemo(() => {
+    const counts = { total: 0, done: 0, pending: 0, failed: 0, generating: 0 };
+    if (!siteStructure) return counts;
+    for (const mod of siteStructure.modules) {
+      for (const f of mod.flows || []) {
+        if (!selectedFlows.has(f.id)) continue;
+        counts.total++;
+        const st = flowStatus[f.id];
+        if (st === 'done') counts.done++;
+        else if (st === 'failed') counts.failed++;
+        else if (st === 'generating' || st === 'saving') counts.generating++;
+        else counts.pending++;
+      }
+    }
+    return counts;
+  }, [siteStructure, selectedFlows, flowStatus]);
 
   /* ============== END GUIDED MODE ============== */
 
@@ -904,33 +1128,85 @@ export function GenerateTestsPage() {
                           customAssertions={customAssertions}
                           expanded={expandedModules.has(mod.id)}
                           expandedFlows={expandedFlows}
+                          flowStatus={flowStatus}
+                          flowError={flowError}
                           onToggleFlow={toggleFlow}
                           onToggleAssertion={toggleAssertion}
                           onAddCustom={addCustomAssertion}
                           onRemoveCustom={removeCustomAssertion}
                           onToggleExpand={() => toggleModuleExpand(mod.id)}
                           onToggleFlowExpand={toggleFlowExpand}
+                          onGenerateFlow={(flow) => generateOneFlow(flow, mod.name, mod.description || '')}
                         />
                       ))}
 
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-[#f5f3ff] p-4">
-                        <div>
-                          <p className="text-sm font-semibold text-[#1e1b4b]">
-                            {selectedFlowCount} flujo{selectedFlowCount !== 1 ? 's' : ''} listo{selectedFlowCount !== 1 ? 's' : ''} para generar
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Cada flujo produce un test case con sus asserciones seleccionadas.
-                          </p>
+                      {/* Bulk control panel */}
+                      <div className="rounded-md bg-[#f5f3ff] p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[#1e1b4b]">
+                              Progreso: {flowCounts.done}/{flowCounts.total} generados
+                              {flowCounts.failed > 0 && (
+                                <span className="ml-2 text-[#ef4444]">
+                                  · {flowCounts.failed} fallaron
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Cada flujo genera su propio test (1 llamada a IA = 1 test). Puedes generar
+                              individualmente con el botón "Generar" o todos a la vez.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {isBulkGenerating ? (
+                              <Button
+                                onClick={abortBulk}
+                                variant="outline"
+                                size="lg"
+                                className="gap-2 border-[#ef4444] text-[#ef4444] hover:bg-red-50"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Detener
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={generateAllPending}
+                                disabled={flowCounts.pending + flowCounts.failed === 0}
+                                size="lg"
+                                className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9]"
+                              >
+                                <Zap className="h-4 w-4" />
+                                Generar {flowCounts.pending + flowCounts.failed} pendiente{flowCounts.pending + flowCounts.failed !== 1 ? 's' : ''}
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <Button
-                          onClick={handleGenerate}
-                          disabled={selectedFlowCount === 0}
-                          size="lg"
-                          className="gap-2 bg-[#7c3aed] hover:bg-[#6d28d9]"
-                        >
-                          <Zap className="h-4 w-4" />
-                          Generar {selectedFlowCount} test{selectedFlowCount !== 1 ? 's' : ''}
-                        </Button>
+
+                        {/* Progress bar */}
+                        {flowCounts.total > 0 && (
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-white">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#7c3aed] to-[#10b981] transition-all"
+                              style={{ width: `${(flowCounts.done / flowCounts.total) * 100}%` }}
+                            />
+                          </div>
+                        )}
+
+                        {flowCounts.done > 0 && (
+                          <div className="flex items-center justify-between rounded-md bg-white p-3">
+                            <p className="text-xs text-muted-foreground">
+                              ✅ {flowCounts.done} test{flowCounts.done !== 1 ? 's' : ''} guardado{flowCounts.done !== 1 ? 's' : ''} en el proyecto
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/projects/${id}/run`)}
+                              className="gap-1 text-xs border-[#10b981]/30 text-[#10b981] hover:bg-green-50"
+                            >
+                              Ir al Ejecutor →
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1163,12 +1439,15 @@ interface ModuleSelectorProps {
   customAssertions: Record<string, { description: string; code: string }[]>;
   expanded: boolean;
   expandedFlows: Set<string>;
+  flowStatus: Record<string, 'idle' | 'generating' | 'saving' | 'done' | 'failed'>;
+  flowError: Record<string, string>;
   onToggleFlow: (flowId: string) => void;
   onToggleAssertion: (flowId: string, assertionId: string) => void;
   onAddCustom: (flowId: string, description: string, code: string) => void;
   onRemoveCustom: (flowId: string, idx: number) => void;
   onToggleExpand: () => void;
   onToggleFlowExpand: (flowId: string) => void;
+  onGenerateFlow: (flow: ExploredFlow) => void;
 }
 
 function ModuleSelector({
@@ -1178,15 +1457,19 @@ function ModuleSelector({
   customAssertions,
   expanded,
   expandedFlows,
+  flowStatus,
+  flowError,
   onToggleFlow,
   onToggleAssertion,
   onAddCustom,
   onRemoveCustom,
   onToggleExpand,
   onToggleFlowExpand,
+  onGenerateFlow,
 }: ModuleSelectorProps) {
   const flows = module.flows || [];
   const selectedCount = flows.filter((f) => selectedFlows.has(f.id)).length;
+  const doneCount = flows.filter((f) => flowStatus[f.id] === 'done').length;
 
   return (
     <div className="rounded-lg border border-[#7c3aed]/20 overflow-hidden">
@@ -1211,6 +1494,11 @@ function ModuleSelector({
           <Badge variant={selectedCount > 0 ? 'success' : 'secondary'}>
             {selectedCount} seleccionados
           </Badge>
+          {doneCount > 0 && (
+            <Badge variant="success" className="bg-[#10b981] text-white">
+              ✓ {doneCount} generados
+            </Badge>
+          )}
         </div>
       </button>
 
@@ -1222,11 +1510,22 @@ function ModuleSelector({
             const assertIds = selectedAssertions[flow.id] || new Set<string>();
             const customs = customAssertions[flow.id] || [];
             const totalAssertCount = assertIds.size + customs.length;
+            const status = flowStatus[flow.id] || 'idle';
+            const err = flowError[flow.id];
             return (
               <div key={flow.id} className="bg-white">
-                <div className="flex items-start gap-3 px-4 py-3 hover:bg-[#f5f3ff]/30">
+                <div
+                  className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                    status === 'done'
+                      ? 'bg-green-50/50'
+                      : status === 'failed'
+                        ? 'bg-red-50/50'
+                        : 'hover:bg-[#f5f3ff]/30'
+                  }`}
+                >
                   <Checkbox
                     checked={isSelected}
+                    disabled={status === 'generating' || status === 'saving'}
                     onCheckedChange={() => onToggleFlow(flow.id)}
                     className="mt-0.5 border-[#7c3aed] data-[state=checked]:bg-[#7c3aed]"
                   />
@@ -1240,9 +1539,12 @@ function ModuleSelector({
                     ) : (
                       <ChevronRight className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[#1e1b4b]">{flow.name}</p>
                       <p className="text-xs text-muted-foreground">{flow.description}</p>
+                      {status === 'failed' && err && (
+                        <p className="mt-1 text-[11px] text-[#ef4444]">⚠ {err}</p>
+                      )}
                     </div>
                   </button>
                   <Badge variant={flow.priority === 'high' ? 'warning' : 'secondary'} className="text-[10px]">
@@ -1253,6 +1555,51 @@ function ModuleSelector({
                       {totalAssertCount} ✓
                     </Badge>
                   )}
+
+                  {/* Per-flow status + generate button */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    {status === 'generating' || status === 'saving' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        className="gap-1 text-[11px] min-w-[100px]"
+                      >
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {status === 'saving' ? 'Guardando...' : 'Generando...'}
+                      </Button>
+                    ) : status === 'done' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onGenerateFlow(flow)}
+                        className="gap-1 text-[11px] min-w-[100px] border-[#10b981] text-[#10b981] hover:bg-green-50"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Regenerar
+                      </Button>
+                    ) : status === 'failed' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onGenerateFlow(flow)}
+                        className="gap-1 text-[11px] min-w-[100px] border-[#ef4444] text-[#ef4444] hover:bg-red-50"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Reintentar
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => onGenerateFlow(flow)}
+                        disabled={!isSelected || totalAssertCount === 0}
+                        className="gap-1 text-[11px] min-w-[100px] bg-[#7c3aed] hover:bg-[#6d28d9]"
+                      >
+                        <Zap className="h-3 w-3" />
+                        Generar
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {isFlowExpanded && (
