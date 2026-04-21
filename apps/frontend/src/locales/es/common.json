@@ -523,6 +523,25 @@
     "addTestCase": "Agregar Caso de Prueba",
     "clickToEditTitle": "Clic para editar titulo"
   },
+  "refineModal": {
+    "title": "Mejorar caso con IA",
+    "buttonTitle": "Mejorar con IA",
+    "testCaseLabel": "Caso de prueba",
+    "currentCode": "Código actual",
+    "feedbackLabel": "¿Qué falló o qué quieres mejorar?",
+    "feedbackPlaceholder": "Ej: la prueba falló con 'TimeoutError: locator.click: Timeout 15000ms exceeded' al hacer click en #login-btn. O describe el caso de uso que no está cubierto correctamente (ej: no valida el mensaje de error cuando la contraseña es incorrecta).",
+    "quickFixSyntax": "🐛 Corregir error de sintaxis",
+    "quickMakeRobust": "💪 Hacer la prueba más robusta",
+    "quickAddAssertions": "✅ Agregar más validaciones",
+    "quickBetterSelectors": "🎯 Usar mejores selectores",
+    "refineBtn": "✨ Mejorar con IA",
+    "refining": "Mejorando...",
+    "success": "Prueba mejorada y guardada",
+    "successHint": "El código actualizado ya pasó la validación del compilador TypeScript.",
+    "error": "Error al mejorar. Intenta describir el problema con más detalle.",
+    "cancel": "Cancelar",
+    "close": "Cerrar"
+  },
   "addTestCaseModal": {
     "title": "Agregar Caso de Prueba",
     "tabManual": "Manual",

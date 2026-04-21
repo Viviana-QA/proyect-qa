@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type {
   AIGenerateRequest,
@@ -17,9 +17,14 @@ export function useGenerateTests() {
 }
 
 export function useRefineTest() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: AIRefineRequest) =>
       api.post<AIRefineResponse>('/ai/refine-test', request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-cases'] });
+      queryClient.invalidateQueries({ queryKey: ['test-case'] });
+    },
   });
 }
 

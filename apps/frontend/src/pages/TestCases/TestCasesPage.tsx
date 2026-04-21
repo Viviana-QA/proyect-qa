@@ -9,6 +9,7 @@ import {
 } from '@/hooks/use-test-cases';
 import { TestCaseEditor } from '@/components/test-editor/TestCaseEditor';
 import { AddTestCaseModal } from './AddTestCaseModal';
+import { RefineTestCaseModal } from './RefineTestCaseModal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import {
   Pencil,
   X,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import type { TestType, TestPriority, TestCase } from '@qa/shared-types';
 
@@ -52,6 +54,7 @@ export function TestCasesPage() {
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const [editorTestCase, setEditorTestCase] = useState<TestCase | null>(null);
   const [addModalSuiteId, setAddModalSuiteId] = useState<string | null>(null);
+  const [refineTestCase, setRefineTestCase] = useState<TestCase | null>(null);
 
   const { data: testCases, isLoading: loadingCases } = useTestCases(projectId!, {
     test_type: typeFilter || undefined,
@@ -300,6 +303,15 @@ export function TestCasesPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-[#7c3aed]"
+                                  onClick={() => setRefineTestCase(tc)}
+                                  title={t('refineModal.buttonTitle')}
+                                >
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-[#7c3aed]"
                                   onClick={() => startEditTitle(tc)}
                                   title={t('common.edit')}
                                 >
@@ -435,6 +447,14 @@ export function TestCasesPage() {
           suiteId={addModalSuiteId}
           projectId={projectId!}
           onClose={() => setAddModalSuiteId(null)}
+        />
+      )}
+
+      {/* Refine Test Case Modal */}
+      {refineTestCase && (
+        <RefineTestCaseModal
+          testCase={refineTestCase}
+          onClose={() => setRefineTestCase(null)}
         />
       )}
     </div>
