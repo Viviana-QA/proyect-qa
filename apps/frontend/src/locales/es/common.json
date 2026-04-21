@@ -509,6 +509,24 @@
     "addTestCase": "Agregar Caso de Prueba",
     "clickToEditTitle": "Clic para editar titulo"
   },
+  "addTestCaseModal": {
+    "title": "Agregar Caso de Prueba",
+    "tabManual": "Manual",
+    "tabAI": "✨ Con IA",
+    "aiDescriptionLabel": "¿Qué debe probar este caso?",
+    "aiDescriptionPlaceholder": "Ej: login con email y contraseña, verificar que redirige al dashboard y muestra el nombre del usuario",
+    "generateBtn": "✨ Generar con IA",
+    "generating": "Generando...",
+    "generatedCodeLabel": "Código generado (puedes editar antes de guardar)",
+    "generationError": "La IA no pudo generar el caso. Intenta describir el escenario con más detalle.",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Ej: Login exitoso con credenciales válidas",
+    "descriptionLabel": "Descripción (opcional)",
+    "tagsPlaceholder": "Etiquetas separadas por coma",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "saving": "Guardando..."
+  },
   "generate": {
     "extracting": "Extrayendo contenido web...",
     "writingTests": "La IA esta escribiendo pruebas en tiempo real...",

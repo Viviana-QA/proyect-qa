@@ -4,16 +4,15 @@ import { useTranslation } from 'react-i18next';
 import {
   useTestCases,
   useTestSuites,
-  useCreateTestCase,
   useUpdateTestCase,
   useDeleteTestCase,
 } from '@/hooks/use-test-cases';
 import { TestCaseEditor } from '@/components/test-editor/TestCaseEditor';
+import { AddTestCaseModal } from './AddTestCaseModal';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Search,
   Plus,
@@ -25,14 +24,12 @@ import {
   X,
   Check,
 } from 'lucide-react';
-import type { TestType, TestPriority, TestCase, CreateTestCaseDto } from '@qa/shared-types';
+import type { TestType, TestPriority, TestCase } from '@qa/shared-types';
 
 const TEST_TYPES: TestType[] = [
   'e2e', 'regression', 'visual', 'accessibility',
   'performance', 'api', 'cross_browser', 'responsive',
 ];
-
-const PRIORITIES: TestPriority[] = ['low', 'medium', 'high', 'critical'];
 
 const priorityVariant = (p: string) => {
   if (p === 'critical') return 'destructive' as const;
@@ -42,25 +39,6 @@ const priorityVariant = (p: string) => {
 
 const statusVariant = (s: string) => (s === 'active' ? 'success' as const : 'secondary' as const);
 
-interface AddFormState {
-  suiteId: string;
-  title: string;
-  description: string;
-  test_type: TestType;
-  priority: TestPriority;
-  playwright_code: string;
-  tags: string;
-}
-
-const emptyForm = (suiteId: string): AddFormState => ({
-  suiteId,
-  title: '',
-  description: '',
-  test_type: 'e2e',
-  priority: 'medium',
-  playwright_code: "import { test, expect } from '@playwright/test';\n\ntest('new test', async ({ page }) => {\n  await page.goto('/');\n});",
-  tags: '',
-});
 
 export function TestCasesPage() {
   const { t } = useTranslation();
@@ -73,14 +51,12 @@ export function TestCasesPage() {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const [editorTestCase, setEditorTestCase] = useState<TestCase | null>(null);
-  const [addFormSuiteId, setAddFormSuiteId] = useState<string | null>(null);
-  const [addForm, setAddForm] = useState<AddFormState | null>(null);
+  const [addModalSuiteId, setAddModalSuiteId] = useState<string | null>(null);
 
   const { data: testCases, isLoading: loadingCases } = useTestCases(projectId!, {
     test_type: typeFilter || undefined,
   });
   const { data: testSuites, isLoading: loadingSuites } = useTestSuites(projectId!);
-  const createTestCase = useCreateTestCase(projectId!);
   const updateTestCase = useUpdateTestCase();
   const deleteTestCase = useDeleteTestCase();
 
@@ -162,33 +138,6 @@ export function TestCasesPage() {
     }
   };
 
-  // Add test case form
-  const openAddForm = (suiteId: string) => {
-    setAddFormSuiteId(suiteId);
-    setAddForm(emptyForm(suiteId));
-  };
-
-  const submitAddForm = () => {
-    if (!addForm || !addForm.title.trim() || addForm.suiteId === '__unassigned__') return;
-    const dto: CreateTestCaseDto = {
-      suite_id: addForm.suiteId,
-      title: addForm.title.trim(),
-      description: addForm.description.trim() || undefined,
-      test_type: addForm.test_type,
-      priority: addForm.priority,
-      playwright_code: addForm.playwright_code,
-      tags: addForm.tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-    };
-    createTestCase.mutate(dto, {
-      onSuccess: () => {
-        setAddForm(null);
-        setAddFormSuiteId(null);
-      },
-    });
-  };
 
   const isLoading = loadingCases || loadingSuites;
   const totalCases = testCases?.length || 0;
@@ -451,86 +400,15 @@ export function TestCasesPage() {
                     {/* Add Test Case Button */}
                     {suiteId !== '__unassigned__' && (
                       <div className="px-5 py-3 border-t border-[#e9e5f5] bg-[#f5f3ff]/30">
-                        {addFormSuiteId === suiteId && addForm ? (
-                          <div className="space-y-3">
-                            <h4 className="text-sm font-semibold text-[#1e1b4b]">{t('testCasesPage.addNewTestCase')}</h4>
-                            <Input
-                              placeholder={t('testCasesPage.titlePlaceholder')}
-                              value={addForm.title}
-                              onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
-                            />
-                            <Textarea
-                              placeholder={t('testCasesPage.descriptionPlaceholder')}
-                              value={addForm.description}
-                              onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
-                              rows={2}
-                            />
-                            <div className="flex gap-3">
-                              <select
-                                value={addForm.test_type}
-                                onChange={(e) => setAddForm({ ...addForm, test_type: e.target.value as TestType })}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm flex-1"
-                              >
-                                {TEST_TYPES.map((tt) => (
-                                  <option key={tt} value={tt}>{tt.replace('_', ' ').toUpperCase()}</option>
-                                ))}
-                              </select>
-                              <select
-                                value={addForm.priority}
-                                onChange={(e) => setAddForm({ ...addForm, priority: e.target.value as TestPriority })}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm flex-1"
-                              >
-                                {PRIORITIES.map((p) => (
-                                  <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                {t('testCasesPage.playwrightCode')}
-                              </label>
-                              <Textarea
-                                value={addForm.playwright_code}
-                                onChange={(e) => setAddForm({ ...addForm, playwright_code: e.target.value })}
-                                rows={6}
-                                className="font-mono text-xs"
-                              />
-                            </div>
-                            <Input
-                              placeholder={t('testCasesPage.tagsPlaceholder')}
-                              value={addForm.tags}
-                              onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
-                            />
-                            <div className="flex gap-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => { setAddForm(null); setAddFormSuiteId(null); }}
-                              >
-                                {t('common.cancel')}
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="gap-1 bg-[#7c3aed] hover:bg-[#6d28d9]"
-                                onClick={submitAddForm}
-                                disabled={!addForm.title.trim() || createTestCase.isPending}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                                {createTestCase.isPending ? t('testCasesPage.creating') : t('testCasesPage.addTestCase')}
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1 text-[#7c3aed] hover:text-[#6d28d9] hover:bg-[#f5f3ff]"
-                            onClick={() => openAddForm(suiteId)}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            {t('testCasesPage.addTestCase')}
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 text-[#7c3aed] hover:text-[#6d28d9] hover:bg-[#f5f3ff]"
+                          onClick={() => setAddModalSuiteId(suiteId)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          {t('testCasesPage.addTestCase')}
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -548,6 +426,15 @@ export function TestCasesPage() {
           onSave={handleCodeSave}
           onClose={() => setEditorTestCase(null)}
           isSaving={updateTestCase.isPending}
+        />
+      )}
+
+      {/* Add Test Case Modal (manual + AI-assisted) */}
+      {addModalSuiteId && (
+        <AddTestCaseModal
+          suiteId={addModalSuiteId}
+          projectId={projectId!}
+          onClose={() => setAddModalSuiteId(null)}
         />
       )}
     </div>

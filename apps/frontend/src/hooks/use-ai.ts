@@ -5,6 +5,8 @@ import type {
   AIGenerateResponse,
   AIRefineRequest,
   AIRefineResponse,
+  AICompleteTestRequest,
+  AICompleteTestResponse,
 } from '@qa/shared-types';
 
 export function useGenerateTests() {
@@ -18,6 +20,13 @@ export function useRefineTest() {
   return useMutation({
     mutationFn: (request: AIRefineRequest) =>
       api.post<AIRefineResponse>('/ai/refine-test', request),
+  });
+}
+
+export function useCompleteTestCase() {
+  return useMutation({
+    mutationFn: (req: AICompleteTestRequest) =>
+      api.post<AICompleteTestResponse>('/ai/complete-test-case', req),
   });
 }
 

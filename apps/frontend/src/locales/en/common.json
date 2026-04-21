@@ -509,6 +509,24 @@
     "addTestCase": "Add Test Case",
     "clickToEditTitle": "Click to edit title"
   },
+  "addTestCaseModal": {
+    "title": "Add Test Case",
+    "tabManual": "Manual",
+    "tabAI": "✨ With AI",
+    "aiDescriptionLabel": "What should this test verify?",
+    "aiDescriptionPlaceholder": "E.g.: login with email and password, verify redirect to dashboard and user name is visible",
+    "generateBtn": "✨ Generate with AI",
+    "generating": "Generating...",
+    "generatedCodeLabel": "Generated code (you can edit before saving)",
+    "generationError": "AI could not generate the test case. Try describing the scenario in more detail.",
+    "titleLabel": "Title",
+    "titlePlaceholder": "E.g.: Successful login with valid credentials",
+    "descriptionLabel": "Description (optional)",
+    "tagsPlaceholder": "Tags separated by comma",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving..."
+  },
   "generate": {
     "extracting": "Extracting web content...",
     "writingTests": "AI is writing tests in real-time...",
