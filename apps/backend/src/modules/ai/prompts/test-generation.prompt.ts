@@ -143,6 +143,14 @@ ${currentCode}
 FEEDBACK:
 ${feedback}
 
+SYNTAX RULES (STRICT — your output is parsed with the TypeScript compiler and REJECTED if invalid):
+- Regex literals must be valid JavaScript. NEVER put characters after the closing /. WRONG: /.*foo/.*/  CORRECT: /.*foo.*/
+- Escape forward slashes inside regex patterns.
+- Balance every quote, backtick, paren, brace, bracket. Never leave \${ unclosed.
+- No markdown fences or triple-backtick blocks in the response.
+- No export statements.
+- The code MUST contain at least one test(...) call.
+
 Return ONLY the refined TypeScript test code, no explanations. Keep the @playwright/test import and test structure.`;
 }
 

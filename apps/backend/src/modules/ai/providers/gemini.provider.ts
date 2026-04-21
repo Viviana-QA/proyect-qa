@@ -21,7 +21,10 @@ export class GeminiProvider implements AIProvider {
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.getOrThrow('GEMINI_API_KEY');
     const genAI = new GoogleGenerativeAI(apiKey);
-    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    // gemini-2.5-flash — full flash model, much better code quality than
+    // flash-lite and still on the free tier. Upgrade path: gemini-2.5-pro
+    // (lower quota) or Claude Haiku via Anthropic API (paid, best quality).
+    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   }
 
   async generateTestCases(
@@ -79,7 +82,16 @@ export class GeminiProvider implements AIProvider {
       generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
     });
 
-    return result.response.text();
+    const raw = result.response.text();
+    // Validate with the TS compiler — a refined test with syntax errors
+    // is worse than no refinement. If invalid, keep the original code.
+    const validation = validateAndFixTestCode(raw);
+    if (!validation.valid) {
+      throw new Error(
+        `Refined test has syntax errors: ${validation.errors.join('; ')}`,
+      );
+    }
+    return validation.fixed!;
   }
 
   async completeSingleTest(
