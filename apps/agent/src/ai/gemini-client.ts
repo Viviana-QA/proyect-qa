@@ -37,9 +37,9 @@ export class GeminiClient {
 
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     this.jsonModel = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
       },
