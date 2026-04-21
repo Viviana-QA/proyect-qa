@@ -4,6 +4,7 @@ import type {
   AIGeneratedTestCase,
   TestType,
 } from '@qa/shared-types';
+import { validateAndFixTestCode } from './utils/test-validator';
 
 export interface BusinessContext {
   project_type?: string;
@@ -143,6 +144,15 @@ Generate Playwright test cases for EACH requested test type. For each test case,
 3. Handles loading states with waitFor or appropriate timeouts
 4. Navigates to the correct URL using the base URL: ${baseUrl}
 
+## SYNTAX RULES (STRICT — invalid tests are parsed by the TypeScript compiler and DROPPED)
+- Regex literals must be valid JavaScript. NEVER put characters after the closing /. WRONG: /.*foo/.*/  CORRECT: /.*foo.*/
+- Escape forward slashes inside regex patterns. WRONG: /path/to/ CORRECT: /path\\/to/
+- Balance every quote, backtick, paren, brace, and bracket. Never leave \${ unclosed in a template literal.
+- No markdown fences inside playwright_code.
+- No export statements in the test code.
+- Each playwright_code MUST contain at least one test(...) call.
+- Prefer plain strings or getByRole over regex whenever possible.
+
 ## Output Format
 Return a JSON array of test case objects. Each object must have:
 - title: string (descriptive test name)
@@ -215,7 +225,7 @@ Return ONLY the fixed Playwright test code. No markdown fences, no explanations,
       if (!Array.isArray(parsed)) {
         throw new Error('Expected JSON array of test cases');
       }
-      return parsed.map((tc: any) => ({
+      const raw = parsed.map((tc: any) => ({
         title: tc.title || 'Untitled Test',
         description: tc.description || '',
         test_type: tc.test_type || 'e2e',
@@ -225,6 +235,18 @@ Return ONLY the fixed Playwright test code. No markdown fences, no explanations,
         browser_targets: tc.browser_targets || ['chromium'],
         viewport_config: tc.viewport_config,
       }));
+      const validated: AIGeneratedTestCase[] = [];
+      for (const tc of raw) {
+        const result = validateAndFixTestCode(tc.playwright_code);
+        if (result.valid && result.fixed) {
+          validated.push({ ...tc, playwright_code: result.fixed });
+        } else {
+          console.warn(
+            `[AI] Dropping invalid test "${tc.title}": ${result.errors.join('; ')}`,
+          );
+        }
+      }
+      return validated;
     } catch (error: any) {
       console.error('Failed to parse AI response as JSON:', error.message);
       console.error('Raw response (first 500 chars):', cleaned.substring(0, 500));
