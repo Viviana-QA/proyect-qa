@@ -9,6 +9,8 @@ import {
   AIGenerateResponse,
   AIRefineRequest,
   AIRefineResponse,
+  AICompleteTestRequest,
+  AICompleteTestResponse,
   AIGenerationJob,
   TestType,
 } from '../../shared-types';
@@ -75,6 +77,14 @@ export class AIService {
         'Add authentication steps if the app requires login',
       ],
     };
+  }
+
+  async completeSingleTest(
+    request: AICompleteTestRequest,
+  ): Promise<AICompleteTestResponse> {
+    const test_case = await this.gemini.completeSingleTest(request);
+    // Do NOT persist — the frontend saves it after the user confirms.
+    return { test_case };
   }
 
   async refineTest(request: AIRefineRequest): Promise<AIRefineResponse> {

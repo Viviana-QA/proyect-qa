@@ -4,6 +4,7 @@ import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
   AIRefineRequest,
+  AICompleteTestRequest,
   CreateGenerationJobDto,
 } from '../../shared-types';
 
@@ -25,6 +26,11 @@ export class AIController {
       body.test_types,
     );
     return job;
+  }
+
+  @Post('complete-test-case')
+  async completeTestCase(@Body() request: AICompleteTestRequest) {
+    return this.aiService.completeSingleTest(request);
   }
 
   @Post('refine-test')

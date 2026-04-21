@@ -81,3 +81,18 @@ export interface AIRefineResponse {
   refined_code: string;
   changes_summary: string;
 }
+
+/** Single test-case completion: user describes what to test, AI returns a full case. */
+export interface AICompleteTestRequest {
+  project_id: string;
+  suite_id: string;
+  title?: string;
+  description: string;
+  test_type: TestType;
+  priority?: TestPriority;
+  base_url?: string;
+}
+
+export interface AICompleteTestResponse {
+  test_case: AIGeneratedTestCase;
+}

@@ -5,6 +5,7 @@ import { AIProvider } from './ai-provider.interface';
 import {
   AIGenerateRequest,
   AIGeneratedTestCase,
+  AICompleteTestRequest,
 } from '../../../shared-types';
 import {
   buildTestGenerationPrompt,
@@ -79,6 +80,68 @@ export class GeminiProvider implements AIProvider {
     });
 
     return result.response.text();
+  }
+
+  async completeSingleTest(
+    request: AICompleteTestRequest,
+  ): Promise<AIGeneratedTestCase> {
+    const prompt = `You are an expert QA automation engineer. Generate ONE complete Playwright TypeScript test case.
+
+USER REQUEST:
+- Description: ${request.description}
+- Test type: ${request.test_type}
+- Priority: ${request.priority || 'medium'}
+${request.title ? `- Suggested title: ${request.title}` : ''}
+${request.base_url ? `- Base URL: ${request.base_url}` : ''}
+
+SYNTAX RULES (MUST FOLLOW — parsed by TypeScript compiler; invalid tests are DROPPED):
+- Regex literals: ONLY valid JavaScript regex. NEVER put characters after the closing /. WRONG: /.*foo/.*/  CORRECT: /.*foo.*/
+- Escape forward slashes inside regex patterns. WRONG: /path/to/ CORRECT: /path\\/to/
+- Balance every quote, backtick, paren, brace, bracket. Never leave \${ unclosed.
+- No markdown fences, no triple-backtick blocks in playwright_code.
+- No export statements. No imports other than @playwright/test.
+- The playwright_code MUST contain at least one test(...) call.
+- Prefer plain strings or getByRole over regex whenever possible.
+
+OUTPUT FORMAT:
+Return a single JSON object (NOT an array) with this exact shape:
+{
+  "title": "concise test title",
+  "description": "what this test verifies",
+  "test_type": "${request.test_type}",
+  "priority": "${request.priority || 'medium'}",
+  "tags": ["tag1", "tag2"],
+  "playwright_code": "import { test, expect } from '@playwright/test';\\n\\ntest('...', async ({ page }) => {\\n  // ...\\n});",
+  "browser_targets": ["chromium"]
+}`;
+
+    const result = await this.model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const responseText = result.response.text();
+    let parsed: AIGeneratedTestCase;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      throw new Error(
+        `AI returned invalid JSON: ${responseText.substring(0, 200)}`,
+      );
+    }
+
+    const validation = validateAndFixTestCode(parsed.playwright_code || '');
+    if (!validation.valid) {
+      throw new Error(
+        `Generated test has syntax errors: ${validation.errors.join('; ')}`,
+      );
+    }
+
+    return { ...parsed, playwright_code: validation.fixed! };
   }
 
   async analyzeUrl(url: string, pageData: string): Promise<string> {
