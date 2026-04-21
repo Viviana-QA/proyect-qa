@@ -558,7 +558,8 @@
     "tagsPlaceholder": "Tags separated by comma",
     "save": "Save",
     "cancel": "Cancel",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "saveError": "Failed to save the test case. Please try again."
   },
   "generate": {
     "extracting": "Extracting web content...",

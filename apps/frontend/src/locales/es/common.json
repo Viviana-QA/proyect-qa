@@ -558,7 +558,8 @@
     "tagsPlaceholder": "Etiquetas separadas por coma",
     "save": "Guardar",
     "cancel": "Cancelar",
-    "saving": "Guardando..."
+    "saving": "Guardando...",
+    "saveError": "Error al guardar el caso de prueba. Intenta de nuevo."
   },
   "generate": {
     "extracting": "Extrayendo contenido web...",

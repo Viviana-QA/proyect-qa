@@ -50,6 +50,7 @@ export function AddTestCaseModal({ suiteId, projectId, onClose }: Props) {
   const [aiTags, setAiTags] = useState('');
   const [aiError, setAiError] = useState('');
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const createTestCase = useCreateTestCase(projectId);
   const completeTestCase = useCompleteTestCase();
@@ -105,7 +106,14 @@ export function AddTestCaseModal({ suiteId, projectId, onClose }: Props) {
       };
     }
 
-    createTestCase.mutate(dto, { onSuccess: onClose });
+    setSaveError('');
+    createTestCase.mutate(dto, {
+      onSuccess: onClose,
+      onError: (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setSaveError(message || t('addTestCaseModal.saveError'));
+      },
+    });
   };
 
   const canSave =
@@ -322,7 +330,14 @@ export function AddTestCaseModal({ suiteId, projectId, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t px-6 py-4 shrink-0">
+        <div className="border-t px-6 py-4 shrink-0 space-y-3">
+          {saveError && (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             {t('addTestCaseModal.cancel')}
           </Button>
@@ -343,6 +358,7 @@ export function AddTestCaseModal({ suiteId, projectId, onClose }: Props) {
               </>
             )}
           </Button>
+          </div>
         </div>
       </div>
     </div>
