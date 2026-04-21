@@ -37,6 +37,7 @@ REQUIREMENTS:
 - Each test must be independent and self-contained
 - Include descriptive test names and comments
 - Generate 3-5 tests per test type requested
+- CRITICAL: All regex literals must be valid JavaScript. Never put .* or any content after the closing /. Wrong: /foo/.*/  Correct: /foo.*/
 
 OUTPUT FORMAT:
 Return a JSON array of test cases with this structure:
