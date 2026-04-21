@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { CatEyeGlasses } from '@/components/icons/cat-eye-glasses';
 
 interface NavItem {
   nameKey: string;
@@ -58,7 +59,7 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col bg-gradient-to-b from-[#1e1b4b] to-[#312e81]">
       <div className="flex h-16 items-center gap-2 px-6">
-        <TestTube2 className="h-6 w-6 text-[#a78bfa]" />
+        <CatEyeGlasses className="h-7 w-7 text-[#a78bfa]" />
         <span className="text-lg font-bold text-white">{t('nav.appName')}</span>
       </div>
 

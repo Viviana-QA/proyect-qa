@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { TestTube2 } from 'lucide-react';
+import { CatEyeGlasses } from '@/components/icons/cat-eye-glasses';
 import { useTranslation } from 'react-i18next';
 
 export function LoginPage() {
@@ -35,7 +35,7 @@ export function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <TestTube2 className="h-6 w-6 text-primary" />
+            <CatEyeGlasses className="h-7 w-7 text-primary" />
           </div>
           <CardTitle>{t('auth.welcomeBack')}</CardTitle>
           <CardDescription>{t('auth.signInDescription')}</CardDescription>

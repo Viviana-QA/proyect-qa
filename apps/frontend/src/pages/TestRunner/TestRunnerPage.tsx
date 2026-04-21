@@ -91,6 +91,9 @@ function sanitizeTestCode(raw: string): string {
     '',
   );
   code = code.replace(/^\s*export\s+(default\s+)?.*$/gim, '');
+  // Fix broken regex literals like /pattern/.*/ → /pattern.*/ (LLM sometimes
+  // puts content after the closing slash instead of before it)
+  code = code.replace(/\/((?:[^/\n\\]|\\.)+)\/(\.?\*)\//g, (_, p, suffix) => `/${p}${suffix}/`);
   return code.trim();
 }
 
@@ -219,6 +222,7 @@ function buildMacCommand(cfg: RunConfig, configB64: string): string {
     `npx -y playwright install ${cfg.browser} >/dev/null 2>&1`,
     `echo ${configB64} | base64 -d > playwright.config.ts`,
     `(npx playwright test generated-tests.spec.ts --project=${cfg.browser}${cfg.headed ? ' --headed' : ''} --reporter=html || true)`,
+    `lsof -ti:9323 | xargs kill -9 2>/dev/null || true`,
     `npx playwright show-report`,
   ].join(' && ');
 }
@@ -235,6 +239,7 @@ function buildWindowsCommand(cfg: RunConfig, configB64: string): string {
     `npx -y playwright install ${cfg.browser} 2>$null | Out-Null`,
     `[IO.File]::WriteAllBytes('playwright.config.ts', [Convert]::FromBase64String('${configB64}'))`,
     `npx playwright test generated-tests.spec.ts --project=${cfg.browser}${cfg.headed ? ' --headed' : ''} --reporter=html`,
+    `Get-NetTCPConnection -LocalPort 9323 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`,
     `npx playwright show-report`,
   ].join('; ');
 }
