@@ -11,6 +11,7 @@ import {
   buildRefinePrompt,
   buildAnalyzePrompt,
 } from '../prompts/test-generation.prompt';
+import { validateAndFixTestCode } from '../utils/test-validator';
 
 @Injectable()
 export class GeminiProvider implements AIProvider {
@@ -43,7 +44,22 @@ export class GeminiProvider implements AIProvider {
       const testCases: AIGeneratedTestCase[] = Array.isArray(parsed)
         ? parsed
         : parsed.test_cases || [];
-      return testCases;
+
+      // Validate + auto-fix every generated snippet. Drop any that still
+      // don't compile after sanitization so the user never downloads a
+      // spec that will throw SyntaxError.
+      const validated: AIGeneratedTestCase[] = [];
+      for (const tc of testCases) {
+        const result = validateAndFixTestCode(tc.playwright_code || '');
+        if (result.valid && result.fixed) {
+          validated.push({ ...tc, playwright_code: result.fixed });
+        } else {
+          console.warn(
+            `[AI] Dropping invalid test "${tc.title}": ${result.errors.join('; ')}`,
+          );
+        }
+      }
+      return validated;
     } catch {
       throw new Error(
         `Failed to parse AI response as JSON: ${responseText.substring(0, 200)}`,

@@ -37,7 +37,19 @@ REQUIREMENTS:
 - Each test must be independent and self-contained
 - Include descriptive test names and comments
 - Generate 3-5 tests per test type requested
-- CRITICAL: All regex literals must be valid JavaScript. Never put .* or any content after the closing /. Wrong: /foo/.*/  Correct: /foo.*/
+
+SYNTAX RULES (MUST FOLLOW — the output is parsed with the TypeScript compiler and invalid tests are DROPPED):
+- Regex literals: ONLY valid JavaScript regex. NEVER put characters after the closing /. WRONG: /.*foo/.*/  CORRECT: /.*foo.*/
+- Regex literals: escape forward slashes inside patterns. WRONG: /path/to/ CORRECT: /path\\/to/
+- Strings: always balance quotes. Prefer single quotes unless the string contains one.
+- Template literals: balance backticks and \${}. Never leave \${ unclosed.
+- Parentheses, braces, brackets: always balanced.
+- Semicolons: required at the end of statements inside test callbacks.
+- No markdown fences, no triple-backtick blocks anywhere in the playwright_code value.
+- No top-level imports other than @playwright/test (the runner adds it automatically — but it's fine if you include it, it will be stripped).
+- No export statements in the test code.
+- The code MUST contain at least one test(...) call. Do not return bare helper functions.
+- Prefer string locators or getByRole over regex whenever possible. Use regex ONLY when you need pattern matching.
 
 OUTPUT FORMAT:
 Return a JSON array of test cases with this structure:
