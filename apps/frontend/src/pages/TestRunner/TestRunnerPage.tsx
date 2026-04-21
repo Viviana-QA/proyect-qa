@@ -94,6 +94,19 @@ function sanitizeTestCode(raw: string): string {
   // Fix broken regex literals like /pattern/.*/ → /pattern.*/ (LLM sometimes
   // puts content after the closing slash instead of before it)
   code = code.replace(/\/((?:[^/\n\\]|\\.)+)\/(\.?\*)\//g, (_, p, suffix) => `/${p}${suffix}/`);
+  // Runtime-validate every regex literal. If `new RegExp()` rejects it,
+  // replace with a permissive fallback so the spec still parses.
+  code = code.replace(
+    /(?<![A-Za-z0-9_)\]])\/((?:[^/\n\\]|\\.)+)\/([gimsuy]*)/g,
+    (match, pattern: string, flags: string) => {
+      try {
+        new RegExp(pattern, flags);
+        return match;
+      } catch {
+        return `/.*/${flags}`;
+      }
+    },
+  );
   return code.trim();
 }
 
@@ -104,14 +117,57 @@ function sanitizeTestCode(raw: string): string {
  * the other cases from running.
  */
 function looksLikeValidTest(code: string): boolean {
-  if (!/\btest(?:\.describe)?\s*\(/.test(code)) return false;
-  let depth = 0;
-  for (const ch of code) {
-    if (ch === '{') depth++;
-    else if (ch === '}') depth--;
-    if (depth < 0) return false;
+  if (!/\btest(?:\.describe|\.only|\.skip)?\s*\(/.test(code)) return false;
+  // Balance braces, parens and brackets, skipping content inside strings,
+  // template literals, regex literals and comments. This catches the vast
+  // majority of malformed LLM output without a full TS parser.
+  let brace = 0, paren = 0, bracket = 0;
+  let i = 0;
+  const n = code.length;
+  while (i < n) {
+    const ch = code[i];
+    const next = code[i + 1];
+    // Line comment
+    if (ch === '/' && next === '/') {
+      while (i < n && code[i] !== '\n') i++;
+      continue;
+    }
+    // Block comment
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < n && !(code[i] === '*' && code[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    // String literal
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i++;
+      while (i < n && code[i] !== quote) {
+        if (code[i] === '\\') i += 2; else i++;
+      }
+      i++;
+      continue;
+    }
+    // Template literal (no nested ${} balance — good enough)
+    if (ch === '`') {
+      i++;
+      while (i < n && code[i] !== '`') {
+        if (code[i] === '\\') i += 2; else i++;
+      }
+      i++;
+      continue;
+    }
+    if (ch === '{') brace++;
+    else if (ch === '}') brace--;
+    else if (ch === '(') paren++;
+    else if (ch === ')') paren--;
+    else if (ch === '[') bracket++;
+    else if (ch === ']') bracket--;
+    if (brace < 0 || paren < 0 || bracket < 0) return false;
+    i++;
   }
-  return depth === 0;
+  return brace === 0 && paren === 0 && bracket === 0;
 }
 
 /**
