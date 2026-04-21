@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useProject } from '@/hooks/use-projects';
 import { useTestSuites } from '@/hooks/use-test-cases';
 import { useTestRuns } from '@/hooks/use-test-runs';
+import { useJiraConfig } from '@/hooks/use-jira';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/ui/stat-card';
+import type { JiraConfig } from '@qa/shared-types';
 import {
   TestTube2,
   Play,
@@ -18,6 +20,11 @@ import {
   BarChart3,
   Clock,
   Activity,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ArrowRight,
+  Zap,
 } from 'lucide-react';
 
 export function ProjectDetailPage() {
@@ -26,6 +33,7 @@ export function ProjectDetailPage() {
   const { data: project, isLoading } = useProject(id!);
   const { data: suites } = useTestSuites(id!);
   const { data: runs } = useTestRuns(id!);
+  const { data: jiraConfig, isLoading: loadingJira } = useJiraConfig(id!);
 
   if (isLoading) return <p className="text-sm text-muted-foreground">{t('projects.loading')}</p>;
   if (!project) return <p className="text-destructive">{t('projects.projectNotFound')}</p>;
@@ -101,15 +109,14 @@ export function ProjectDetailPage() {
               </Button>
             </Link>
             <Link to={`/projects/${id}/jira`}>
-              <Button
-                size="sm"
-                className="h-8 gap-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 border-0 shadow-none"
-              >
-                <Bug className="h-3.5 w-3.5" />
-                {t('projects.jiraConfig')}
-              </Button>
+              <JiraButton jiraConfig={jiraConfig ?? null} loading={loadingJira} t={t} />
             </Link>
           </div>
+
+          {/* Jira Integration Status Banner */}
+          {!loadingJira && (
+            <JiraStatusBanner jiraConfig={jiraConfig ?? null} projectId={id!} t={t} />
+          )}
         </CardContent>
       </Card>
 
@@ -259,6 +266,159 @@ export function ProjectDetailPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── Jira helpers ──────────────────────────────────────────────────────────
+
+type JiraStatus = 'connected-active' | 'connected-inactive' | 'not-configured';
+
+function getJiraStatus(cfg: JiraConfig | null): JiraStatus {
+  if (!cfg) return 'not-configured';
+  if (cfg.auto_create_on_failure) return 'connected-active';
+  return 'connected-inactive';
+}
+
+/** Action-row button — shows a coloured dot based on Jira status */
+function JiraButton({
+  jiraConfig,
+  loading,
+  t,
+}: {
+  jiraConfig: JiraConfig | null;
+  loading: boolean;
+  t: (k: string) => string;
+}) {
+  const status = getJiraStatus(jiraConfig);
+  const dotColor =
+    status === 'connected-active'
+      ? 'bg-[#10b981]'
+      : status === 'connected-inactive'
+      ? 'bg-[#f59e0b]'
+      : 'bg-[#ef4444]';
+
+  return (
+    <Button
+      size="sm"
+      className="h-8 gap-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 border-0 shadow-none"
+    >
+      <span className="relative flex items-center">
+        <Bug className="h-3.5 w-3.5" />
+        {!loading && (
+          <span
+            className={`absolute -right-1 -top-1 h-2 w-2 rounded-full ${dotColor} ring-1 ring-white`}
+          />
+        )}
+      </span>
+      {t('projects.jiraConfig')}
+    </Button>
+  );
+}
+
+/** Compact banner below action buttons showing Jira integration state */
+function JiraStatusBanner({
+  jiraConfig,
+  projectId,
+  t,
+}: {
+  jiraConfig: JiraConfig | null;
+  projectId: string;
+  t: (k: string, opts?: Record<string, unknown>) => string;
+}) {
+  const status = getJiraStatus(jiraConfig);
+
+  if (status === 'not-configured') {
+    return (
+      <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3">
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ef4444]" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[#991b1b]">
+            {t('projects.jiraNotConfigured')}
+          </p>
+          <p className="mt-0.5 text-xs text-[#b91c1c]">
+            {t('projects.jiraNotConfiguredHint')}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {['jiraUrl', 'jiraEmail', 'jiraToken', 'jiraProjectKey'].map((field) => (
+              <span
+                key={field}
+                className="inline-flex items-center gap-1 rounded-full border border-[#fca5a5] bg-white px-2 py-0.5 text-xs text-[#991b1b]"
+              >
+                <XCircle className="h-3 w-3" />
+                {t(`projects.jiraField_${field}`)}
+              </span>
+            ))}
+          </div>
+        </div>
+        <Link to={`/projects/${projectId}/jira`} className="shrink-0">
+          <Button size="sm" className="h-7 gap-1 bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs">
+            {t('projects.jiraConfigure')}
+            <ArrowRight className="h-3 w-3" />
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (status === 'connected-inactive') {
+    return (
+      <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[#92400e]">
+            {t('projects.jiraConnectedInactive')}
+          </p>
+          <p className="mt-0.5 text-xs text-[#b45309]">
+            {t('projects.jiraConnectedInactiveHint', {
+              project: jiraConfig!.jira_project_key,
+            })}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#fcd34d] bg-white px-2 py-0.5 text-xs text-[#92400e]">
+              <CheckCircle2 className="h-3 w-3 text-[#10b981]" />
+              {t('projects.jiraField_jiraUrl')}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#fcd34d] bg-white px-2 py-0.5 text-xs text-[#92400e]">
+              <CheckCircle2 className="h-3 w-3 text-[#10b981]" />
+              {t('projects.jiraField_jiraProjectKey')}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#fcd34d] bg-white px-2 py-0.5 text-xs text-[#92400e]">
+              <AlertTriangle className="h-3 w-3 text-[#d97706]" />
+              {t('projects.jiraAutoCreateDisabled')}
+            </span>
+          </div>
+        </div>
+        <Link to={`/projects/${projectId}/jira`} className="shrink-0">
+          <Button size="sm" className="h-7 gap-1 bg-[#d97706] hover:bg-[#b45309] text-white text-xs">
+            <Zap className="h-3 w-3" />
+            {t('projects.jiraActivate')}
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // connected-active
+  return (
+    <div className="mt-4 flex items-center gap-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3">
+      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#10b981]" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[#065f46]">
+          {t('projects.jiraConnectedActive')}
+        </p>
+        <p className="mt-0.5 text-xs text-[#047857]">
+          {t('projects.jiraConnectedActiveHint', {
+            project: jiraConfig!.jira_project_key,
+            issueType: jiraConfig!.issue_type,
+          })}
+        </p>
+      </div>
+      <Link to={`/projects/${projectId}/jira`} className="shrink-0">
+        <Button size="sm" variant="outline" className="h-7 text-xs border-[#86efac] text-[#065f46] hover:bg-[#dcfce7]">
+          {t('projects.jiraManage')}
+        </Button>
+      </Link>
     </div>
   );
 }
